@@ -2,16 +2,21 @@
 //
 
 #include "stdafx.h"
+#include "Commctrl.h"
 #include "Win32Project1.h"
 
 #define MAX_LOADSTRING 100
-#define CREATE 1
-#define OPENF 2
-#define SAVEF 3
-#define SAVEFA 4
-#define PRINT 5
-#define ABOUT 6
-#define EX 7
+#define CREATE 1          //Create         Main menu comands
+#define OPENF 2			  //Open file
+#define SAVEF 3           //Save file
+#define SAVEFA 4          //Save file ass
+#define PRINT 5			  //Print
+#define ABOUT 6           //About
+#define EX 7             //Exit
+
+#define TOOLBAR 8
+#define PENCIL 9            //PENCIL          Toolbar 
+#define LINE 10             //LINE
 
 // Глобальные переменные:
 HWND ItemsBar;
@@ -21,12 +26,24 @@ TCHAR szTitle[MAX_LOADSTRING];					// Текст строки заголовка
 TCHAR szWindowClass[MAX_LOADSTRING];			// имя класса главного окна
 TCHAR szMainBar[MAX_LOADSTRING] = _T("MainBar");
 
+int CommandInd = 0;
+int x, y;
+int a, b;
+HBITMAP hbmp;
+HDC hDC;
+HDC memDC;
+int height, width;
+RECT R;
+
 
 // Отправить объявления функций, включенных в этот модуль кода:
 ATOM            RegisterItemsBar(HINSTANCE hInstance);
 ATOM            RegisterDrawingWind(HINSTANCE hInstance);
 ATOM				MyRegisterClass(HINSTANCE hInstance);
 BOOL				InitInstance(HINSTANCE, int);
+void DrawLine(int x, int y, int a, int b);
+void DrawRectangle(int x, int y, int a, int b);
+void PencilDrawing(int a, int b);
 LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK	DrawProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK	ItemsBarProc(HWND, UINT, WPARAM, LPARAM);
@@ -49,9 +66,9 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	// Инициализация глобальных строк
 	LoadString(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
 	LoadString(hInstance, IDC_WIN32PROJECT1, szWindowClass, MAX_LOADSTRING);
-	RegisterItemsBar(hInstance);
-	RegisterDrawingWind(hInstance);
-	MyRegisterClass(hInstance);
+	RegisterItemsBar(hInstance);          //Items Bar inicialization
+  	RegisterDrawingWind(hInstance);       //Drawing area inicialization
+	MyRegisterClass(hInstance);			//Main Window inicialization
 	// Выполнить инициализацию приложения:
 	if (!InitInstance (hInstance, nCmdShow))
 	{
@@ -62,6 +79,11 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_WIN32PROJECT1));
 
 	// Цикл основного сообщения:
+	
+	
+
+	
+	
 	while (GetMessage(&msg, NULL, 0, 0))
 	{
 		if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
@@ -81,6 +103,8 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 //
 //  НАЗНАЧЕНИЕ: регистрирует класс окна.
 //
+
+//Drawing Area Inicialization
 ATOM RegisterDrawingWind(HINSTANCE hInstance)
 {
 	WNDCLASSEX DrawArea;
@@ -101,6 +125,7 @@ ATOM RegisterDrawingWind(HINSTANCE hInstance)
 	return RegisterClassEx(&DrawArea);
 }
 
+//Items Bar inicialization
 ATOM RegisterItemsBar(HINSTANCE hInstance)
 {
 	WNDCLASSEX ItemsBar;
@@ -120,6 +145,8 @@ ATOM RegisterItemsBar(HINSTANCE hInstance)
 
 	return RegisterClassEx(&ItemsBar);
 }
+
+//Main Window inicialization
 ATOM MyRegisterClass(HINSTANCE hInstance)
 {
 	WNDCLASSEX MainPW;
@@ -156,21 +183,34 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
    HWND hWnd;
    RECT R;
+ 
    hInst = hInstance; // Сохранить дескриптор экземпляра в глобальной переменной
    
    hWnd = CreateWindow(szWindowClass, _T("WPaintLight"), WS_OVERLAPPEDWINDOW,
 	   CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, MainBar() , hInstance, NULL);
 
-   GetClientRect(hWnd, &R);
-   ItemsBar = CreateWindow(_T("ItemsBar"), NULL, WS_CHILD, 0, 0, R.right - R.left, 80, hWnd, NULL, hInst, NULL);
-  
+   GetClientRect(hWnd, &R);                                                                                      //Function to getting window size                                                            
+   ItemsBar = CreateWindow(_T("ItemsBar"), NULL, WS_CHILD, 0, 0, R.right - R.left, 80, hWnd, NULL, hInst, NULL); //Items Bar Creating
+   HWND PencilBut = CreateWindow(_T("BUTTON"), NULL, WS_CHILD | BS_BITMAP | BS_FLAT ,
+	   5, 5, 33, 33, ItemsBar, (HMENU)PENCIL, hInstance, NULL);
+   HBITMAP PI = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_PENCIL));
+   SendMessage(PencilBut, BM_SETIMAGE, IMAGE_BITMAP, (LPARAM)PI);
+   HWND LineBut = CreateWindow(_T("BUTTON"), NULL, WS_CHILD | BS_BITMAP | BS_FLAT,
+	   39, 5, 33, 33, ItemsBar, (HMENU)LINE, hInstance, NULL);
+   PI = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_LINE));
+   SendMessage(LineBut, BM_SETIMAGE, IMAGE_BITMAP, (LPARAM)PI);
+   
+   
+   
    if (!hWnd)
    {
       return FALSE;
    }
    ShowWindow(hWnd, nCmdShow);
-   ShowWindow(ItemsBar, nCmdShow);
+   ShowWindow(ItemsBar, nCmdShow);    
    UpdateWindow(hWnd);
+   ShowWindow(PencilBut, nCmdShow);
+   ShowWindow(LineBut, nCmdShow);
    return TRUE;
 }
 
@@ -190,31 +230,45 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	int wmId, wmEvent;
 	PAINTSTRUCT ps;
 	HDC hdc;
+	HGDIOBJ hOldbmp;
+	HBRUSH hBrush;
+
+	
 	
 
 	switch (message)
 	{
+
 	case WM_COMMAND:
 		wmId    = LOWORD(wParam);
 		wmEvent = HIWORD(wParam);
 		// Разобрать выбор в меню:
 		switch (wmId)
 		{
-		case CREATE:
-			DrawArea = CreateWindow(_T("DrawAria"), NULL, WS_CHILD, 8, 85, 700, 500, hWnd, NULL, hInst, NULL);
+		case CREATE:     //Drawing area creating
+			DrawArea = CreateWindow(_T("DrawAria"), NULL, WS_CHILD, 8 , 85, 700, 500, hWnd, NULL, hInst, NULL);
+			hDC = GetDC(DrawArea);
+			memDC = CreateCompatibleDC(hDC);
+			GetClientRect(DrawArea, &R);
+			height = R.bottom - R.top;
+			width = R.right - R.left;
+			hbmp = CreateCompatibleBitmap(hDC, width , height);
+			hBrush = CreateSolidBrush(RGB(255, 255, 255));
+			hOldbmp = SelectObject(memDC, hbmp);
+			FillRect(memDC, &R, hBrush);
 			ShowWindow(DrawArea, SW_SHOW);
 			break;
-		case OPENF:
+		case OPENF:       //Processing open file
+			break;        
+		case SAVEF:       //Processing save file
 			break;
-		case SAVEF:
+		case SAVEFA:     //Processing save file ass
 			break;
-		case SAVEFA:
+		case PRINT:      //Processing print 
 			break;
-		case PRINT:
+		case ABOUT:        //Processing about
 			break;
-		case ABOUT:
-			break;
-		case EX:
+		case EX:          //Processing exit
 			DestroyWindow(hWnd);
 			break;
 		default:
@@ -224,8 +278,36 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_PAINT:
 		hdc = BeginPaint(hWnd, &ps);
 		// TODO: добавьте любой код отрисовки...
-		
 		EndPaint(hWnd, &ps);
+		break;
+	case WM_MOUSEMOVE:
+		
+		if (wParam == MK_LBUTTON)
+		{
+			a = LOWORD(lParam) - 8;
+			b = HIWORD(lParam) - 85;
+			switch (CommandInd)
+			{
+			case PENCIL:
+				PencilDrawing(a, b);
+				break;
+			case LINE:
+				DrawLine(x, y, a, b);
+				break;
+			default:
+				break;
+			}
+		}
+		else
+		{
+			x = LOWORD(lParam) - 8;
+			y = HIWORD(lParam) - 85;
+			
+		}
+		break;
+	case WM_LBUTTONUP:
+		if(CommandInd != PENCIL)
+		BitBlt(memDC, 0, 0, width, height, hDC, 0, 0, SRCCOPY);
 		break;
 	case WM_DESTROY:
 		PostQuitMessage(0);
@@ -236,8 +318,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
+
+//
+//Draw Aria processing 
 LRESULT CALLBACK	 DrawProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+	
 	int wmId, wmEvent;
 	PAINTSTRUCT ps;
 	HDC hdc;
@@ -259,9 +345,37 @@ LRESULT CALLBACK	 DrawProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 		break;
 	case WM_PAINT:
 		hdc = BeginPaint(hWnd, &ps);
-		// TODO: добавьте любой код отрисовки...
-
+		BitBlt(hdc, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
 		EndPaint(hWnd, &ps);
+		break;
+	
+	case WM_MOUSEMOVE:
+		if (wParam != MK_LBUTTON)
+		{
+			x = LOWORD(lParam);
+			y = HIWORD(lParam);
+		}
+		
+		if(wParam == MK_LBUTTON)
+		{
+			
+			if (CommandInd == PENCIL)
+			{
+				a = LOWORD(lParam);
+				b = HIWORD(lParam);
+				PencilDrawing(a, b);
+				
+			}
+			if (CommandInd == LINE)
+			{
+				a = LOWORD(lParam);
+				b = HIWORD(lParam);
+				DrawLine(x, y, a, b);
+			}
+		}
+		break;
+	case WM_LBUTTONUP:
+		BitBlt(memDC, 0, 0, width, height, hDC, 0, 0, SRCCOPY);
 		break;
 	case WM_DESTROY:
 		PostQuitMessage(0);
@@ -272,8 +386,11 @@ LRESULT CALLBACK	 DrawProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 	return 0;
 }
 
+//
+//Items Bar processing
 LRESULT CALLBACK ItemsBarProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+	
 	int wmId, wmEvent;
 	PAINTSTRUCT ps;
 	HDC hdc;
@@ -286,13 +403,17 @@ LRESULT CALLBACK ItemsBarProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 		// Разобрать выбор в меню:
 		switch (wmId)
 		{
-		case EX:
-
+		case PENCIL:
+			CommandInd = PENCIL;
+			break;
+		case LINE:
+			CommandInd = LINE;
 			break;
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam);
 		}
 		break;
+
 	case WM_PAINT:
 		hdc = BeginPaint(hWnd, &ps);
 		// TODO: добавьте любой код отрисовки...
@@ -302,18 +423,41 @@ LRESULT CALLBACK ItemsBarProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		break;
+	case WM_MOUSEMOVE:
+		a = LOWORD(lParam) - 8;
+		b = HIWORD(lParam) - 85;
+		if (wParam == MK_LBUTTON)
+		{
+			switch (CommandInd)
+			{
+			case PENCIL:
+				PencilDrawing(a, b);
+				break;
+			case LINE:
+				DrawLine(x, y, a, b);
+				break;
+			default:
+				break;
+			}
+		}
+		break;
+	case WM_LBUTTONUP:
+		if (CommandInd != PENCIL)
+		BitBlt(memDC, 0, 0, width, height, hDC, 0, 0, SRCCOPY);
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
 	}
 	return 0;
 }
 
+
+//main menu with only one field "File"
 HMENU MainBar()
 {
 	HMENU Bar = CreateMenu();
 	HMENU File = CreatePopupMenu();
-	AppendMenu(Bar, MF_STRING | MF_POPUP, (UINT)File, _T("Файл"));
-	AppendMenu(File, MF_STRING, CREATE, _T("Создать"));
+	AppendMenu(Bar, MF_STRING | MF_POPUP, (UINT)File, _T("Файл"));      // Field "File"
+	AppendMenu(File, MF_STRING, CREATE, _T("Создать"));                 //content of "File"  
 	AppendMenu(File, MF_SEPARATOR, NULL, _T(""));
 	AppendMenu(File, MF_STRING, SAVEF, _T("Открыть..."));
 	AppendMenu(File, MF_STRING, SAVEF, _T("Сохранить"));
@@ -323,6 +467,36 @@ HMENU MainBar()
 	AppendMenu(File, MF_SEPARATOR, NULL, _T(""));
 	AppendMenu(File, MF_STRING, ABOUT, _T("О Программе..."));
 	AppendMenu(File, MF_SEPARATOR, NULL, _T(""));
-	AppendMenu(File, MF_STRING, EX, _T("Выйти"));
+	AppendMenu(File, MF_STRING, EX, _T("Выйти"));                      //content of "File"
 	return Bar;
+}
+
+void DrawLine(int x, int y, int a, int b)
+{
+	
+	HPEN newPen = CreatePen(PS_SOLID, 2, RGB(0, 0, 0));
+	SelectObject(hDC, newPen);
+	MoveToEx(hDC, x, y, NULL);
+	LineTo(hDC, a, b);
+	BitBlt(hDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
+	MoveToEx(hDC, x, y, NULL);
+	LineTo(hDC, a, b);
+	DeleteObject(newPen);
+}
+
+void DrawRectanglee(int x, int y, int a, int b)
+{
+
+}
+
+void PencilDrawing(int a, int b)
+{
+	HPEN newPen = CreatePen(PS_SOLID, 2, RGB(0, 0, 0));
+	DeleteObject(SelectObject(memDC, newPen));
+	MoveToEx(memDC, x, y, NULL);
+	LineTo(memDC, a, b);
+	BitBlt(hDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
+	DeleteObject(newPen);
+	x = a;
+	y = b;
 }
