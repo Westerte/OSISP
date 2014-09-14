@@ -15,9 +15,12 @@
 #define EX 7             //Exit
 
 #define TOOLBAR 8
-#define PENCIL 9            //PENCIL          Toolbar 
-#define LINE 10             //LINE
-
+#define PENCIL 9                    // Toolbar 
+#define LINE 10            
+#define RECTANGLE 11   
+#define CIRCLE 12 
+#define ELLIPSE 13
+#define TRIANGEL 14
 // Глобальные переменные:
 HWND ItemsBar;
 HWND DrawArea;
@@ -33,17 +36,23 @@ HBITMAP hbmp;
 HDC hDC;
 HDC memDC;
 int height, width;
-RECT R;
-
+RECT DrawAreaClientRect, DrawAreaRect;
+HGDIOBJ OldBrush;
+HGDIOBJ OldPen;
 
 // Отправить объявления функций, включенных в этот модуль кода:
 ATOM            RegisterItemsBar(HINSTANCE hInstance);
 ATOM            RegisterDrawingWind(HINSTANCE hInstance);
 ATOM				MyRegisterClass(HINSTANCE hInstance);
 BOOL				InitInstance(HINSTANCE, int);
+void AllDraw(RECT R, WPARAM wParam, LPARAM lParam, int Kof1, int Kof2);
+void PencilDrawing(int a, int b);
 void DrawLine(int x, int y, int a, int b);
 void DrawRectangle(int x, int y, int a, int b);
-void PencilDrawing(int a, int b);
+void DrawCircle(int x, int y, int a, int b);
+void DrawEllipse(int x, int y, int a, int b);
+void DrawTriangle(int x, int y, int a, int b);
+
 LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK	DrawProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK	ItemsBarProc(HWND, UINT, WPARAM, LPARAM);
@@ -69,6 +78,7 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	RegisterItemsBar(hInstance);          //Items Bar inicialization
   	RegisterDrawingWind(hInstance);       //Drawing area inicialization
 	MyRegisterClass(hInstance);			//Main Window inicialization
+
 	// Выполнить инициализацию приложения:
 	if (!InitInstance (hInstance, nCmdShow))
 	{
@@ -191,16 +201,36 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
    GetClientRect(hWnd, &R);                                                                                      //Function to getting window size                                                            
    ItemsBar = CreateWindow(_T("ItemsBar"), NULL, WS_CHILD, 0, 0, R.right - R.left, 80, hWnd, NULL, hInst, NULL); //Items Bar Creating
+  
    HWND PencilBut = CreateWindow(_T("BUTTON"), NULL, WS_CHILD | BS_BITMAP | BS_FLAT ,
 	   5, 5, 33, 33, ItemsBar, (HMENU)PENCIL, hInstance, NULL);
    HBITMAP PI = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_PENCIL));
    SendMessage(PencilBut, BM_SETIMAGE, IMAGE_BITMAP, (LPARAM)PI);
+   
    HWND LineBut = CreateWindow(_T("BUTTON"), NULL, WS_CHILD | BS_BITMAP | BS_FLAT,
 	   39, 5, 33, 33, ItemsBar, (HMENU)LINE, hInstance, NULL);
    PI = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_LINE));
    SendMessage(LineBut, BM_SETIMAGE, IMAGE_BITMAP, (LPARAM)PI);
    
-   
+   HWND RectangleBut = CreateWindow(_T("BUTTON"), NULL, WS_CHILD | BS_BITMAP | BS_FLAT,
+	   73, 5, 33, 33, ItemsBar, (HMENU)RECTANGLE, hInstance, NULL);
+   PI = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_RECTANGLE));
+   SendMessage(RectangleBut, BM_SETIMAGE, IMAGE_BITMAP, (LPARAM)PI);
+
+   HWND CircleBut = CreateWindow(_T("BUTTON"), NULL, WS_CHILD | BS_BITMAP | BS_FLAT,
+	   107, 5, 33, 33, ItemsBar, (HMENU)CIRCLE, hInstance, NULL);
+   PI = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_CIRCLE));
+   SendMessage(CircleBut, BM_SETIMAGE, IMAGE_BITMAP, (LPARAM)PI);
+
+   HWND EllipseBut = CreateWindow(_T("BUTTON"), NULL, WS_CHILD | BS_BITMAP | BS_FLAT,
+	   5, 39, 33, 33, ItemsBar, (HMENU)ELLIPSE, hInstance, NULL);
+   PI = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_ELLIPSE));
+   SendMessage(EllipseBut, BM_SETIMAGE, IMAGE_BITMAP, (LPARAM)PI);
+
+   HWND TriangelBut = CreateWindow(_T("BUTTON"), NULL, WS_CHILD | BS_BITMAP | BS_FLAT,
+	   39, 39, 33, 33, ItemsBar, (HMENU)TRIANGEL, hInstance, NULL);
+   PI = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_TRIANGEL));
+   SendMessage(TriangelBut, BM_SETIMAGE, IMAGE_BITMAP, (LPARAM)PI);
    
    if (!hWnd)
    {
@@ -211,6 +241,10 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    UpdateWindow(hWnd);
    ShowWindow(PencilBut, nCmdShow);
    ShowWindow(LineBut, nCmdShow);
+   ShowWindow(RectangleBut, nCmdShow);
+   ShowWindow(CircleBut, nCmdShow);
+   ShowWindow(EllipseBut, nCmdShow);
+   ShowWindow(TriangelBut, nCmdShow);
    return TRUE;
 }
 
@@ -231,8 +265,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	PAINTSTRUCT ps;
 	HDC hdc;
 	HGDIOBJ hOldbmp;
-	HBRUSH hBrush;
-
+	HBRUSH hBrush, newBrush;
+	HPEN newPen;
+	LOGBRUSH PreBrush;
 	
 	
 
@@ -249,13 +284,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			DrawArea = CreateWindow(_T("DrawAria"), NULL, WS_CHILD, 8 , 85, 700, 500, hWnd, NULL, hInst, NULL);
 			hDC = GetDC(DrawArea);
 			memDC = CreateCompatibleDC(hDC);
-			GetClientRect(DrawArea, &R);
-			height = R.bottom - R.top;
-			width = R.right - R.left;
+			GetWindowRect(DrawArea, &DrawAreaRect);
+			GetClientRect(DrawArea, &DrawAreaClientRect);
+			height = DrawAreaClientRect.bottom - DrawAreaClientRect.top;
+			width = DrawAreaClientRect.right - DrawAreaClientRect.left;
 			hbmp = CreateCompatibleBitmap(hDC, width , height);
 			hBrush = CreateSolidBrush(RGB(255, 255, 255));
 			hOldbmp = SelectObject(memDC, hbmp);
-			FillRect(memDC, &R, hBrush);
+			FillRect(memDC, &DrawAreaClientRect, hBrush);
+			newPen = CreatePen(PS_SOLID, 2, RGB(0, 0, 0));
+			PreBrush.lbStyle = BS_HOLLOW;
+			newBrush = CreateBrushIndirect(&PreBrush);
+		    OldBrush = SelectObject(hDC, newBrush);
+			DeleteObject(SelectObject(memDC, newPen));
+			OldPen = SelectObject(hDC, newPen);
 			ShowWindow(DrawArea, SW_SHOW);
 			break;
 		case OPENF:       //Processing open file
@@ -281,29 +323,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		EndPaint(hWnd, &ps);
 		break;
 	case WM_MOUSEMOVE:
-		
-		if (wParam == MK_LBUTTON)
-		{
-			a = LOWORD(lParam) - 8;
-			b = HIWORD(lParam) - 85;
-			switch (CommandInd)
-			{
-			case PENCIL:
-				PencilDrawing(a, b);
-				break;
-			case LINE:
-				DrawLine(x, y, a, b);
-				break;
-			default:
-				break;
-			}
-		}
-		else
-		{
-			x = LOWORD(lParam) - 8;
-			y = HIWORD(lParam) - 85;
-			
-		}
+		AllDraw(DrawAreaClientRect, wParam, lParam, 8, 85);
 		break;
 	case WM_LBUTTONUP:
 		if(CommandInd != PENCIL)
@@ -348,31 +368,8 @@ LRESULT CALLBACK	 DrawProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 		BitBlt(hdc, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
 		EndPaint(hWnd, &ps);
 		break;
-	
 	case WM_MOUSEMOVE:
-		if (wParam != MK_LBUTTON)
-		{
-			x = LOWORD(lParam);
-			y = HIWORD(lParam);
-		}
-		
-		if(wParam == MK_LBUTTON)
-		{
-			
-			if (CommandInd == PENCIL)
-			{
-				a = LOWORD(lParam);
-				b = HIWORD(lParam);
-				PencilDrawing(a, b);
-				
-			}
-			if (CommandInd == LINE)
-			{
-				a = LOWORD(lParam);
-				b = HIWORD(lParam);
-				DrawLine(x, y, a, b);
-			}
-		}
+		AllDraw(DrawAreaClientRect, wParam, lParam, 0 ,0);
 		break;
 	case WM_LBUTTONUP:
 		BitBlt(memDC, 0, 0, width, height, hDC, 0, 0, SRCCOPY);
@@ -409,6 +406,18 @@ LRESULT CALLBACK ItemsBarProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 		case LINE:
 			CommandInd = LINE;
 			break;
+		case RECTANGLE:
+			CommandInd = RECTANGLE;
+			break;
+		case CIRCLE:
+			CommandInd = CIRCLE;
+			break;
+		case ELLIPSE:
+			CommandInd = ELLIPSE;
+			break;
+		case TRIANGEL:
+			CommandInd = TRIANGEL;
+			break;
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam);
 		}
@@ -424,22 +433,7 @@ LRESULT CALLBACK ItemsBarProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 		PostQuitMessage(0);
 		break;
 	case WM_MOUSEMOVE:
-		a = LOWORD(lParam) - 8;
-		b = HIWORD(lParam) - 85;
-		if (wParam == MK_LBUTTON)
-		{
-			switch (CommandInd)
-			{
-			case PENCIL:
-				PencilDrawing(a, b);
-				break;
-			case LINE:
-				DrawLine(x, y, a, b);
-				break;
-			default:
-				break;
-			}
-		}
+		AllDraw(DrawAreaClientRect, wParam, lParam, 8, 85);
 		break;
 	case WM_LBUTTONUP:
 		if (CommandInd != PENCIL)
@@ -471,32 +465,125 @@ HMENU MainBar()
 	return Bar;
 }
 
-void DrawLine(int x, int y, int a, int b)
+void AllDraw(RECT R, WPARAM wParam, LPARAM lParam , int Kof1, int Kof2 )
 {
-	
-	HPEN newPen = CreatePen(PS_SOLID, 2, RGB(0, 0, 0));
-	SelectObject(hDC, newPen);
-	MoveToEx(hDC, x, y, NULL);
-	LineTo(hDC, a, b);
-	BitBlt(hDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
-	MoveToEx(hDC, x, y, NULL);
-	LineTo(hDC, a, b);
-	DeleteObject(newPen);
-}
+	if (wParam != MK_LBUTTON)
+	{
+		x = LOWORD(lParam) - Kof1;
+		y = HIWORD(lParam) - Kof2;
+	}
+	if (wParam == MK_LBUTTON)
+	{
+		a = LOWORD(lParam) - Kof1;
+		b = HIWORD(lParam) - Kof2;
+		if (CommandInd == PENCIL)
+			PencilDrawing(a, b);
 
-void DrawRectanglee(int x, int y, int a, int b)
-{
+		if (CommandInd == LINE)
+			if ((x >= R.left) && (x <= R.right)
+				&& (y >= R.top) && (y <= R.bottom))
+				DrawLine(x, y, a, b);
+		
 
+		if (CommandInd == RECTANGLE)
+			if ((x >= R.left) && (x <= R.right)
+				&& (y >= R.top) && (y <= R.bottom))
+				DrawRectangle(x, y, a, b);
+		
+		if (CommandInd == CIRCLE)
+			if ((x >= R.left) && (x <= R.right)
+				&& (y >= R.top) && (y <= R.bottom))
+				DrawCircle(x, y, a, b);
+
+		if (CommandInd == ELLIPSE)
+			if ((x >= R.left) && (x <= R.right)
+				&& (y >= R.top) && (y <= R.bottom))
+				DrawEllipse(x, y, a, b);
+
+		if (CommandInd == TRIANGEL)
+			if ((x >= R.left) && (x <= R.right)
+				&& (y >= R.top) && (y <= R.bottom))
+				DrawTriangle(x, y, a, b);
+	}
 }
 
 void PencilDrawing(int a, int b)
 {
-	HPEN newPen = CreatePen(PS_SOLID, 2, RGB(0, 0, 0));
-	DeleteObject(SelectObject(memDC, newPen));
+
 	MoveToEx(memDC, x, y, NULL);
 	LineTo(memDC, a, b);
 	BitBlt(hDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
-	DeleteObject(newPen);
 	x = a;
 	y = b;
 }
+
+void DrawLine(int x, int y, int a, int b)
+{
+	MoveToEx(hDC, x, y, NULL);
+	LineTo(hDC, a, b);
+	BitBlt(hDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
+	MoveToEx(hDC, x, y, NULL);
+	LineTo(hDC, a, b);
+}
+
+void DrawRectangle(int x, int y, int a, int b)
+{
+	Rectangle(hDC, x, y, a, b);
+	BitBlt(hDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
+	Rectangle(hDC, x, y, a, b);
+	
+}
+
+void DrawCircle(int x, int y, int a, int b)
+{
+	if ((a > x && b > y) || (a < x && b < y))
+		Ellipse(hDC, x, y, x + (b - y), b );
+	else
+		Ellipse(hDC, x, y, a, y - (a - x));
+	BitBlt(hDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
+	if ((a > x && b > y) || (a < x && b < y))
+		Ellipse(hDC, x, y, x + (b - y), b);
+	else
+		Ellipse(hDC, x, y, a, y - (a - x));
+}
+
+void DrawEllipse(int x, int y, int a, int b)
+{
+	Ellipse(hDC, x, y, a, b);
+	BitBlt(hDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
+	Ellipse(hDC, x, y, a, b);
+}
+
+void DrawTriangle(int x, int y, int a, int b)
+{
+	if (b > y)
+	{	
+		MoveToEx(hDC, x, b, NULL);
+		LineTo(hDC, a, b);
+		LineTo(hDC, x + (a - x) / 2, y);
+		LineTo(hDC, x, b);
+	}
+	else
+	{
+		MoveToEx(hDC, a, y, NULL);
+		LineTo(hDC, x, y);
+		LineTo(hDC, a + (x - a) / 2, b);
+		LineTo(hDC, a, y);
+	}
+	BitBlt(hDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
+	if (b > y)
+	{
+		MoveToEx(hDC, x, b, NULL);
+		LineTo(hDC, a, b);
+		LineTo(hDC, x + (a - x) / 2, y);
+		LineTo(hDC, x, b);
+	}
+	else
+	{
+		MoveToEx(hDC, a, y, NULL);
+		LineTo(hDC, x, y);
+		LineTo(hDC, a + (x - a) / 2, b);
+		LineTo(hDC, a, y);
+	}
+}
+

@@ -12,6 +12,10 @@
 #define IDC_STATIC				-1
 #define IDB_PENCIL                      131
 #define IDB_LINE                      132
+#define IDB_RECTANGLE                      133
+#define IDB_CIRCLE                     134
+#define IDB_ELLIPSE                    135
+#define IDB_TRIANGEL                   136
 #define IDI_SMALL                       108
 #endif
 // Следующие стандартные значения для новых объектов
