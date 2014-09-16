@@ -16,6 +16,8 @@
 #define IDB_CIRCLE                     134
 #define IDB_ELLIPSE                    135
 #define IDB_TRIANGEL                   136
+#define IDB_TEXT                137
+#define IDB_POLYGON            138
 #define IDI_SMALL                       108
 #endif
 // Следующие стандартные значения для новых объектов

@@ -21,6 +21,10 @@
 #define CIRCLE 12 
 #define ELLIPSE 13
 #define TRIANGEL 14
+#define POLYGON 15
+#define TEXT 16
+#define EDITCONT 17
+
 // Глобальные переменные:
 HWND ItemsBar;
 HWND DrawArea;
@@ -28,15 +32,18 @@ HINSTANCE hInst;								// текущий экземпляр
 TCHAR szTitle[MAX_LOADSTRING];					// Текст строки заголовка
 TCHAR szWindowClass[MAX_LOADSTRING];			// имя класса главного окна
 TCHAR szMainBar[MAX_LOADSTRING] = _T("MainBar");
+HWND TextWnd;
+
 
 int CommandInd = 0;
 int x, y;
 int a, b;
+int bx = -1, by = -1;
 HBITMAP hbmp;
 HDC hDC;
 HDC memDC;
 int height, width;
-RECT DrawAreaClientRect, DrawAreaRect;
+RECT DrawAreaClientRect, DrawAreaRect ,R;
 HGDIOBJ OldBrush;
 HGDIOBJ OldPen;
 
@@ -52,6 +59,7 @@ void DrawRectangle(int x, int y, int a, int b);
 void DrawCircle(int x, int y, int a, int b);
 void DrawEllipse(int x, int y, int a, int b);
 void DrawTriangle(int x, int y, int a, int b);
+void DrawTextT(int x, int y, int a, int b);
 
 LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK	DrawProc(HWND, UINT, WPARAM, LPARAM);
@@ -231,6 +239,16 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	   39, 39, 33, 33, ItemsBar, (HMENU)TRIANGEL, hInstance, NULL);
    PI = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_TRIANGEL));
    SendMessage(TriangelBut, BM_SETIMAGE, IMAGE_BITMAP, (LPARAM)PI);
+
+   HWND PolygonBut = CreateWindow(_T("BUTTON"), NULL, WS_CHILD | BS_BITMAP | BS_FLAT,
+	   73, 39, 33, 33, ItemsBar, (HMENU)POLYGON, hInstance, NULL);
+   PI = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_POLYGON));
+   SendMessage(PolygonBut, BM_SETIMAGE, IMAGE_BITMAP, (LPARAM)PI);
+
+   HWND TextBut = CreateWindow(_T("BUTTON"), NULL, WS_CHILD | BS_BITMAP | BS_FLAT,
+	   107, 39, 33, 33, ItemsBar, (HMENU)TEXT, hInstance, NULL);
+   PI = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_TEXT));
+   SendMessage(TextBut, BM_SETIMAGE, IMAGE_BITMAP, (LPARAM)PI);
    
    if (!hWnd)
    {
@@ -245,6 +263,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    ShowWindow(CircleBut, nCmdShow);
    ShowWindow(EllipseBut, nCmdShow);
    ShowWindow(TriangelBut, nCmdShow);
+   ShowWindow(PolygonBut, nCmdShow);
+   ShowWindow(TextBut, nCmdShow);
    return TRUE;
 }
 
@@ -323,11 +343,24 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		EndPaint(hWnd, &ps);
 		break;
 	case WM_MOUSEMOVE:
+		if (TextWnd == NULL)
 		AllDraw(DrawAreaClientRect, wParam, lParam, 8, 85);
 		break;
 	case WM_LBUTTONUP:
-		if(CommandInd != PENCIL)
-		BitBlt(memDC, 0, 0, width, height, hDC, 0, 0, SRCCOPY);
+		if ((CommandInd == TEXT) && (TextWnd == NULL))
+		{
+			if (x < a && y < b)
+			if ((x >= DrawAreaClientRect.left) && (x <= DrawAreaClientRect.right)
+				&& (y >= DrawAreaClientRect.top) && (y <= DrawAreaClientRect.bottom))
+			{
+				TextWnd = CreateWindow(_T("EDIT"), NULL, WS_CHILD | WS_VISIBLE
+					| WS_BORDER | ES_MULTILINE, x, y, abs(x - a),
+					abs(y - b), DrawArea, (HMENU)EDITCONT, hInst, NULL);
+				ShowWindow(TextWnd, SW_SHOW);
+			}
+		}
+		if ((CommandInd != TEXT) && (TextWnd == NULL) && (CommandInd != POLYGON))
+			BitBlt(memDC, 0, 0, width, height, hDC, 0, 0, SRCCOPY);
 		break;
 	case WM_DESTROY:
 		PostQuitMessage(0);
@@ -335,7 +368,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
 	}
-	return 0;
+	return 0; 
 }
 
 
@@ -347,6 +380,8 @@ LRESULT CALLBACK	 DrawProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 	int wmId, wmEvent;
 	PAINTSTRUCT ps;
 	HDC hdc;
+	TCHAR buf[1024] = _T("");
+	
 
 	switch (message)
 	{
@@ -369,10 +404,84 @@ LRESULT CALLBACK	 DrawProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 		EndPaint(hWnd, &ps);
 		break;
 	case WM_MOUSEMOVE:
+		if (TextWnd == NULL)
 		AllDraw(DrawAreaClientRect, wParam, lParam, 0 ,0);
 		break;
 	case WM_LBUTTONUP:
-		BitBlt(memDC, 0, 0, width, height, hDC, 0, 0, SRCCOPY);
+		if ((CommandInd == TEXT) && (TextWnd == NULL))
+		{	
+			if (x < a && y < b)
+			if ((x >= DrawAreaClientRect.left) && (x <= DrawAreaClientRect.right)
+				&& (y >= DrawAreaClientRect.top) && (y <= DrawAreaClientRect.bottom))
+			{	TextWnd = CreateWindow(_T("EDIT"), NULL, WS_CHILD | WS_VISIBLE
+					| WS_BORDER | ES_MULTILINE, x, y, abs(x - a),
+					abs(y - b), DrawArea, (HMENU)EDITCONT, hInst, NULL);
+				ShowWindow(TextWnd, SW_SHOW);
+			}
+		}
+		if ((CommandInd != TEXT) && (TextWnd == NULL) && (CommandInd != POLYGON))
+			BitBlt(memDC, 0, 0, width, height, hDC, 0, 0, SRCCOPY);
+		break;
+
+	case WM_RBUTTONDOWN:
+		if (TextWnd != NULL)
+		{
+			SendMessage(TextWnd, EM_FMTLINES, TRUE, NULL);
+			GetWindowText(TextWnd, buf, 1024);
+			int i = 0;
+			while (buf[i] != '\0')
+			{
+				if ((buf[i] == '\r') && (buf[i + 1] == '\r'))
+				{
+					int j = i;
+					while (buf[j] != '\0')
+					{
+						buf[j] = buf[j+1];
+						j++;
+					}
+				}
+				i++;
+			}
+			SetRect(&R, x,y,a,b);
+			SetBkMode(memDC, TRANSPARENT);
+			DrawText(memDC, buf, 1024, &R, DT_LEFT | DT_TOP);
+			DestroyWindow(TextWnd);
+			BitBlt(hDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
+			TextWnd = NULL;
+			UpdateWindow(DrawArea);
+		}
+		break;
+	case WM_LBUTTONDOWN:
+		if (CommandInd == POLYGON)
+		{
+			if (bx == -1)
+			{
+				bx = x = LOWORD(lParam);
+				by = y = HIWORD(lParam);
+				
+			}
+			else
+			{
+				if ((abs(bx - a) <= 8) && (abs(by - b) <= 8))
+				{
+					MoveToEx(memDC, x, y, NULL);
+					LineTo(memDC, bx, by);
+					BitBlt(hDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
+					bx = by = -1;
+				}
+				else
+				{
+					a = LOWORD(lParam);
+					b = HIWORD(lParam);
+					MoveToEx(memDC, x, y, NULL);
+					LineTo(memDC, a, b);
+					x = a;
+					y = b;
+				}
+			}
+			
+			
+		}
 		break;
 	case WM_DESTROY:
 		PostQuitMessage(0);
@@ -397,7 +506,9 @@ LRESULT CALLBACK ItemsBarProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 	case WM_COMMAND:
 		wmId = LOWORD(wParam);
 		wmEvent = HIWORD(wParam);
+		bx = -1, by = -1;
 		// Разобрать выбор в меню:
+		if (TextWnd == NULL)
 		switch (wmId)
 		{
 		case PENCIL:
@@ -418,6 +529,12 @@ LRESULT CALLBACK ItemsBarProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 		case TRIANGEL:
 			CommandInd = TRIANGEL;
 			break;
+		case POLYGON:
+			CommandInd = POLYGON;
+			break;
+		case TEXT:
+			CommandInd = TEXT;
+			break;
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam);
 		}
@@ -433,11 +550,25 @@ LRESULT CALLBACK ItemsBarProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 		PostQuitMessage(0);
 		break;
 	case WM_MOUSEMOVE:
-		AllDraw(DrawAreaClientRect, wParam, lParam, 8, 85);
+		if ((TextWnd == NULL))
+			AllDraw(DrawAreaClientRect, wParam, lParam, 8, 85);
 		break;
 	case WM_LBUTTONUP:
-		if (CommandInd != PENCIL)
-		BitBlt(memDC, 0, 0, width, height, hDC, 0, 0, SRCCOPY);
+		if ((CommandInd == TEXT) && (TextWnd == NULL))
+		{	
+			if (x < a && y < b)
+			if ((x >= DrawAreaClientRect.left) && (x <= DrawAreaClientRect.right)
+				&& (y >= DrawAreaClientRect.top) && (y <= DrawAreaClientRect.bottom))
+			{
+				TextWnd = CreateWindow(_T("EDIT"), NULL, WS_CHILD | WS_VISIBLE
+					| WS_BORDER | ES_MULTILINE, x, y, abs(x - a),
+					abs(y - b), DrawArea, (HMENU)EDITCONT, hInst, NULL);
+				ShowWindow(TextWnd, SW_SHOW);
+			}
+		}
+		if ((CommandInd != TEXT) && (TextWnd == NULL) && (CommandInd != POLYGON))
+			BitBlt(memDC, 0, 0, width, height, hDC, 0, 0, SRCCOPY);
+		break;
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
 	}
@@ -467,12 +598,26 @@ HMENU MainBar()
 
 void AllDraw(RECT R, WPARAM wParam, LPARAM lParam , int Kof1, int Kof2 )
 {
-	if (wParam != MK_LBUTTON)
+	if ((wParam != MK_LBUTTON))
 	{
-		x = LOWORD(lParam) - Kof1;
-		y = HIWORD(lParam) - Kof2;
+		if (CommandInd != POLYGON)
+		{
+			x = LOWORD(lParam) - Kof1;
+			y = HIWORD(lParam) - Kof2;
+		}
+		else
+		{
+			if (bx != -1)
+			{
+				a = LOWORD(lParam) - Kof1;
+				b = HIWORD(lParam) - Kof2;
+				if ((x >= R.left) && (x <= R.right)
+					&& (y >= R.top) && (y <= R.bottom))
+					DrawLine(x, y, a, b);
+			}
+		}
 	}
-	if (wParam == MK_LBUTTON)
+	if ((wParam == MK_LBUTTON) && (CommandInd != POLYGON))
 	{
 		a = LOWORD(lParam) - Kof1;
 		b = HIWORD(lParam) - Kof2;
@@ -483,7 +628,6 @@ void AllDraw(RECT R, WPARAM wParam, LPARAM lParam , int Kof1, int Kof2 )
 			if ((x >= R.left) && (x <= R.right)
 				&& (y >= R.top) && (y <= R.bottom))
 				DrawLine(x, y, a, b);
-		
 
 		if (CommandInd == RECTANGLE)
 			if ((x >= R.left) && (x <= R.right)
@@ -504,6 +648,14 @@ void AllDraw(RECT R, WPARAM wParam, LPARAM lParam , int Kof1, int Kof2 )
 			if ((x >= R.left) && (x <= R.right)
 				&& (y >= R.top) && (y <= R.bottom))
 				DrawTriangle(x, y, a, b);
+		
+		if (CommandInd == TEXT)
+		{	
+			if ((x >= R.left) && (x <= R.right)
+				&& (y >= R.top) && (y <= R.bottom))
+				DrawTextT(x, y, a, b);
+			
+		}
 	}
 }
 
@@ -531,7 +683,6 @@ void DrawRectangle(int x, int y, int a, int b)
 	Rectangle(hDC, x, y, a, b);
 	BitBlt(hDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
 	Rectangle(hDC, x, y, a, b);
-	
 }
 
 void DrawCircle(int x, int y, int a, int b)
@@ -587,3 +738,15 @@ void DrawTriangle(int x, int y, int a, int b)
 	}
 }
 
+void DrawTextT(int x, int y, int a, int b)
+{
+	HGDIOBJ OldPen;
+	HPEN NewPen = CreatePen(PS_DASH, 1, RGB(0,0,0));
+	OldPen = SelectObject(hDC, (HPEN)NewPen);
+	if (x < a && y < b)
+	Rectangle(hDC, x, y, a, b);
+	BitBlt(hDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
+	if (x < a && y < b)
+	Rectangle(hDC, x, y, a, b);
+	DeleteObject(SelectObject(hDC, (HPEN)OldPen));
+}
