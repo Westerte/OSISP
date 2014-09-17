@@ -5,7 +5,7 @@
 #include "Commctrl.h"
 #include "Win32Project1.h"
 #include "Commdlg.h"
-#include "Windows.h"
+#include "Wingdi.h"
 
 #define MAX_LOADSTRING 100
 #define CREATE 1          //Create         Main menu comands
@@ -26,8 +26,13 @@
 #define POLYGON 15
 #define TEXT 16
 #define EDITCONT 17
+#define COMBOX 18
+#define LABEL2 19
+#define LABEL3 20
+
 
 // Глобальные переменные:
+float k ;
 HWND ItemsBar;
 HWND DrawArea;
 HINSTANCE hInst;								// текущий экземпляр
@@ -37,6 +42,11 @@ TCHAR szMainBar[MAX_LOADSTRING] = _T("MainBar");
 HWND TextWnd;
 LPENHMETAHEADER Header;
 PRINTDLG pd;
+HWND hWndComboBox;
+COLORREF Col = RGB(0, 0, 0);
+COLORREF ColB = RGB(255, 255, 255);
+int index;
+HWND LineColor, BrushColor;
 
 int CommandInd = 0;
 int x, y;
@@ -50,11 +60,15 @@ RECT DrawAreaClientRect, DrawAreaRect ,R;
 HGDIOBJ OldBrush;
 HGDIOBJ OldPen;
 TCHAR fileName[MAX_PATH] = _T("");
+HWND label2;
+HWND label3;
+int x_k = 0, y_k = 0;
 
 // Отправить объявления функций, включенных в этот модуль кода:
 ATOM            RegisterItemsBar(HINSTANCE hInstance);
 ATOM            RegisterDrawingWind(HINSTANCE hInstance);
 ATOM				MyRegisterClass(HINSTANCE hInstance);
+ATOM RegisterColorsWindows(HINSTANCE hInstance);
 BOOL				InitInstance(HINSTANCE, int);
 void AllDraw(RECT R, WPARAM wParam, LPARAM lParam, int Kof1, int Kof2);
 void PencilDrawing(int a, int b);
@@ -70,7 +84,7 @@ LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK	DrawProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK	ItemsBarProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
-
+LRESULT CALLBACK ColorProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 HMENU MainBar();
 
 
@@ -92,15 +106,31 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	RegisterItemsBar(hInstance);          //Items Bar inicialization
   	RegisterDrawingWind(hInstance);       //Drawing area inicialization
 	MyRegisterClass(hInstance);			//Main Window inicialization
-
+	RegisterColorsWindows(hInstance);
 	// Выполнить инициализацию приложения:
 	if (!InitInstance (hInstance, nCmdShow))
 	{
 		return FALSE;
 	}
+	k = 1.0;
 	
-	
-	hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_WIN32PROJECT1));
+	ACCEL acc[5];
+	acc[0].cmd = CREATE;
+	acc[0].fVirt = FVIRTKEY | FCONTROL;
+	acc[0].key = 0x4E;
+	acc[1].cmd = EX;
+	acc[1].fVirt = FVIRTKEY | FCONTROL;
+	acc[1].key = VK_F4;
+	acc[2].cmd = OPENF;
+	acc[2].fVirt = FVIRTKEY | FCONTROL;
+	acc[2].key = 0x4F;
+	acc[3].cmd = PRINT;
+	acc[3].fVirt = FVIRTKEY | FCONTROL;
+	acc[3].key = 0x50;
+	acc[4].cmd = SAVEFA;
+	acc[4].fVirt = FVIRTKEY | FCONTROL;
+	acc[4].key = 0x53;
+	hAccelTable = CreateAcceleratorTable((LPACCEL)acc, 5);
 
 	// Цикл основного сообщения:
 	
@@ -169,6 +199,27 @@ ATOM RegisterItemsBar(HINSTANCE hInstance)
 
 	return RegisterClassEx(&ItemsBar);
 }
+
+ATOM RegisterColorsWindows(HINSTANCE hInstance)
+{
+	WNDCLASSEX ItemsBar;
+
+	ItemsBar.cbSize = sizeof(WNDCLASSEX);
+	ItemsBar.style = CS_HREDRAW | CS_VREDRAW;
+	ItemsBar.lpfnWndProc = ColorProc;
+	ItemsBar.cbClsExtra = 0;
+	ItemsBar.cbWndExtra = 0;
+	ItemsBar.hInstance = hInstance;
+	ItemsBar.hIcon = NULL;
+	ItemsBar.hCursor = LoadCursor(NULL, IDC_ARROW);
+	ItemsBar.hbrBackground = CreateSolidBrush(Col);
+	ItemsBar.lpszMenuName = NULL;
+	ItemsBar.lpszClassName = _T("ColorClass");
+	ItemsBar.hIconSm = NULL;
+
+	return RegisterClassEx(&ItemsBar);
+}
+
 
 //Main Window inicialization
 ATOM MyRegisterClass(HINSTANCE hInstance)
@@ -255,13 +306,42 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	   107, 39, 33, 33, ItemsBar, (HMENU)TEXT, hInstance, NULL);
    PI = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_TEXT));
    SendMessage(TextBut, BM_SETIMAGE, IMAGE_BITMAP, (LPARAM)PI);
-
-   HWND hWndComboBox = CreateWindow(WC_COMBOBOX,NULL,
-	   CBS_DROPDOWN | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VISIBLE,
-	   150, 6, 120, 20, ItemsBar, NULL, hInstance,
+   HWND label = CreateWindow(_T("static"), _T("Ширина линии:"),
+	   WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+	   195, 5, 120, 23,
+	   hWnd, NULL,
+	   hInstance, NULL);
+   hWndComboBox = CreateWindow(WC_COMBOBOX,NULL,
+	   CBS_DROPDOWN | WS_CHILD | WS_VISIBLE | CBS_SIMPLE,
+	   195, 30, 120, 180, ItemsBar, (HMENU)COMBOX, hInstance,
 	   NULL);
-   SendMessage(hWndComboBox, CB_ADDSTRING, (WPARAM)0, (LPARAM));
 
+   
+   SendMessage(hWndComboBox, CB_ADDSTRING, (WPARAM)0, (LPARAM)_T("1"));
+   SendMessage(hWndComboBox, CB_ADDSTRING, (WPARAM)0, (LPARAM)_T("2"));
+   SendMessage(hWndComboBox, CB_ADDSTRING, (WPARAM)0, (LPARAM)_T("3"));
+   SendMessage(hWndComboBox, CB_ADDSTRING, (WPARAM)0, (LPARAM)_T("4"));
+   SendMessage(hWndComboBox, CB_ADDSTRING, (WPARAM)0, (LPARAM)_T("5"));
+   SendMessage(hWndComboBox, CB_ADDSTRING, (WPARAM)0, (LPARAM)_T("6"));
+   SendMessage(hWndComboBox, CB_SELECTSTRING, 0, (LPARAM)_T("1"));
+   
+   label2 = CreateWindow(_T("BUTTON"), _T("Цвет линии:"), WS_CHILD | BS_FLAT,
+	   340, 5, 120, 23,
+	   ItemsBar, (HMENU)LABEL2,
+	   hInstance, NULL);
+   LineColor = CreateWindow(_T("ColorClass"), NULL, WS_CHILD | WS_BORDER,
+	   470, 5, 23, 23,
+	   ItemsBar, NULL,
+	   hInstance, NULL);
+   BrushColor = CreateWindow(_T("ColorClass"), NULL, WS_CHILD|WS_BORDER,
+	   470, 39, 23, 23,
+	   ItemsBar, NULL,
+	   hInstance, NULL);
+   label3 = CreateWindow(_T("BUTTON"), _T("Цвет кисти:"), WS_CHILD | BS_FLAT,
+	   340, 39, 120, 23,
+	   ItemsBar, (HMENU)LABEL3,
+	   hInstance, NULL);
+  
    
    if (!hWnd)
    {
@@ -278,6 +358,10 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    ShowWindow(TriangelBut, nCmdShow);
    ShowWindow(PolygonBut, nCmdShow);
    ShowWindow(TextBut, nCmdShow);
+   ShowWindow(label2, nCmdShow);
+   ShowWindow(label3, nCmdShow);
+   ShowWindow(LineColor, nCmdShow);
+   ShowWindow(BrushColor, nCmdShow);
    return TRUE;
 }
 
@@ -301,7 +385,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	HBRUSH hBrush, newBrush;
 	HPEN newPen;
 	LOGBRUSH PreBrush;
-	
+	int delta;
 	
 
 	switch (message)
@@ -314,6 +398,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		switch (wmId)
 		{
 		case CREATE:     //Drawing area creating
+			k = 1;
+			Col = RGB(0, 0, 0);
+			ColB = RGB(255, 255, 255);
+			RECT RCT;
+			GetClientRect(LineColor, &RCT);
+			InvalidateRect(LineColor, &RCT, FALSE);
+			InvalidateRect(BrushColor, &RCT, FALSE);
 			if (memDC != NULL)
 			{
 				ReleaseDC(DrawArea, hDC);
@@ -345,7 +436,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			hBrush = CreateSolidBrush(RGB(255, 255, 255));
 			hOldbmp = SelectObject(memDC, hbmp);
 			FillRect(memDC, &DrawAreaClientRect, hBrush);
-			newPen = CreatePen(PS_SOLID, 2, RGB(0, 0, 0));
+			newPen = CreatePen(PS_SOLID, SendMessage(hWndComboBox, CB_GETCURSEL, 0, 0)+1
+            , Col);
 			PreBrush.lbStyle = BS_HOLLOW;
 			newBrush = CreateBrushIndirect(&PreBrush);
 		    OldBrush = SelectObject(hDC, newBrush);
@@ -372,8 +464,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					bx = -1;
 					by = -1;
 				}
+				k = 1;
 			}
-			
+			Col = RGB(0, 0, 0);
+			ColB = RGB(255, 255, 255);
+			RECT RCTS;
+			GetClientRect(LineColor, &RCTS);
+			InvalidateRect(LineColor, &RCTS, FALSE);
+			InvalidateRect(BrushColor, &RCTS, FALSE);
 			OPENFILENAME ofn;
 			
 			RECTL HeaderRect;
@@ -392,6 +490,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 			if (GetOpenFileName(&ofn))
 			{
+				
 				HENHMETAFILE h = GetEnhMetaFile(ofn.lpstrFile);
 				int siz = GetEnhMetaFileHeader(h, 0, NULL);
 				Header = (LPENHMETAHEADER)GlobalAlloc(0, siz);
@@ -408,8 +507,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				hBrush = CreateSolidBrush(RGB(255, 255, 255));
 				hOldbmp = SelectObject(memDC, hbmp);
 				FillRect(memDC, &DrawAreaClientRect, hBrush);
-				newPen = CreatePen(PS_SOLID, 2, RGB(0, 0, 0));
+				newPen = CreatePen(PS_SOLID, SendMessage(hWndComboBox, CB_GETCURSEL, 0, 0)+1
+					, Col);
 				PreBrush.lbStyle = BS_HOLLOW;
+				
 				newBrush = CreateBrushIndirect(&PreBrush);
 				OldBrush = SelectObject(hDC, newBrush);
 				DeleteObject(SelectObject(memDC, newPen));
@@ -515,6 +616,90 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		if ((CommandInd != TEXT) && (TextWnd == NULL) && (CommandInd != POLYGON))
 			BitBlt(memDC, 0, 0, width, height, hDC, 0, 0, SRCCOPY);
 		break;
+	case WM_MOUSEWHEEL:
+	if ((TextWnd == NULL) && (bx == -1))
+		{
+			delta = HIWORD(wParam);
+			newBrush = CreateSolidBrush(RGB(255, 255, 255));
+			if (GET_KEYSTATE_WPARAM(wParam) == MK_CONTROL)
+			{
+				if (delta == 120)
+				{
+					x_k = x_k + 30;
+					if (x_k >= 700)
+					{
+						x_k = 700;
+						break;
+					}
+					FillRect(hDC, &DrawAreaClientRect, newBrush);
+					StretchBlt(hDC, 0 + x_k, 0 + y_k, width, height, memDC, 0, 0, (int)width*k, (int)height*k, SRCCOPY);
+				}
+				else
+				{
+					x_k = x_k - 30;
+					if (x_k <= -700)
+					{
+						x_k = -700;
+						break;
+					}
+					FillRect(hDC, &DrawAreaClientRect, newBrush);
+					StretchBlt(hDC, 0 + x_k, 0 + y_k, width, height, memDC, 0, 0, (int)width*k, (int)height*k, SRCCOPY);
+				}
+				break;
+			}
+			if (GET_KEYSTATE_WPARAM(wParam) == MK_SHIFT)
+			{
+				if (delta == 120)
+				{
+					y_k = y_k + 30;
+					if (y_k >= 400)
+					{
+						y_k = 400;
+						break;
+					}
+					FillRect(hDC, &DrawAreaClientRect, newBrush);
+					StretchBlt(hDC, 0 + x_k, 0 + y_k, width, height, memDC, 0, 0, (int)width*k, (int)height*k, SRCCOPY);
+				}
+				else
+				{
+					y_k = y_k - 30;
+					if (y_k <= -700)
+					{
+						y_k = -700;
+						break;
+					}
+					FillRect(hDC, &DrawAreaClientRect, newBrush);
+					StretchBlt(hDC, 0 + x_k, 0 + y_k, width, height, memDC, 0, 0, (int)width*k, (int)height*k, SRCCOPY);
+				}
+				break;
+			}
+				if (delta == 120)
+				{
+					k -= 0.15;
+					if (k <= 0.1)
+					{
+						k = 0.15;
+						break;
+					}
+
+
+					FillRect(hDC, &DrawAreaClientRect, newBrush);
+					StretchBlt(hDC, 0 + x_k, 0 + y_k, width, height, memDC, 0, 0, (int)width*k, (int)height*k, SRCCOPY);
+				}
+				else
+				{
+					k += 0.15;
+					if (k >= 4)
+					{
+						k = 3.85;
+						break;
+					}
+					FillRect(hDC, &DrawAreaClientRect, newBrush);
+					StretchBlt(hDC, 0 + x_k, 0 + y_k, width, height, memDC, 0, 0, (int)width*k, (int)height*k, SRCCOPY);
+				}
+			}
+			break;
+		
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		break;
@@ -633,13 +818,16 @@ LRESULT CALLBACK	 DrawProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 				}
 			}
 			
-			
 		}
+		k = 1;
 		break;
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
+
+		
 	}
 	return 0;
+	SetFocus(NULL);
 }
 
 //
@@ -650,7 +838,9 @@ LRESULT CALLBACK ItemsBarProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 	int wmId, wmEvent;
 	PAINTSTRUCT ps;
 	HDC hdc;
-
+	HPEN newPen;
+	CHOOSECOLOR COLOR;
+	
 	switch (message)
 	{
 	case WM_COMMAND:
@@ -684,6 +874,52 @@ LRESULT CALLBACK ItemsBarProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 			break;
 		case TEXT:
 			CommandInd = TEXT;
+			break;
+		case COMBOX:
+			index = SendMessage(hWndComboBox, CB_GETCURSEL, 0, 0);
+			if (memDC != 0)
+			{
+				newPen = CreatePen(PS_SOLID, index + 1, Col);
+				DeleteObject(SelectObject(memDC, newPen));
+				DeleteObject(SelectObject(hDC, newPen));
+			}
+			break;
+		case LABEL2:
+			memset(&COLOR, 0, sizeof(CHOOSECOLOR));
+			COLOR.lStructSize = sizeof(CHOOSECOLOR);
+			COLOR.hwndOwner = hWnd;
+			COLOR.lpCustColors = &Col;
+			COLOR.Flags = CC_ANYCOLOR | CC_FULLOPEN;
+			if ((ChooseColor(&COLOR) == TRUE) && (memDC != NULL))
+			{
+				Col = COLOR.rgbResult;
+				HDC COL1 = GetDC(LineColor);
+				HBRUSH newBrush = CreateSolidBrush(Col);
+				RECT RCT;
+				GetClientRect(LineColor, &RCT);
+				FillRect(COL1, &RCT, newBrush);
+				newPen = CreatePen(PS_SOLID, index + 1, Col);
+				DeleteObject(SelectObject(memDC, newPen));
+				DeleteObject(SelectObject(hDC, newPen));
+			}
+			break;
+		case LABEL3:
+			memset(&COLOR, 0, sizeof(CHOOSECOLOR));
+			COLOR.lStructSize = sizeof(CHOOSECOLOR);
+			COLOR.hwndOwner = hWnd;
+			COLOR.lpCustColors = &ColB;
+			COLOR.Flags = CC_ANYCOLOR | CC_FULLOPEN;
+			if ((ChooseColor(&COLOR) == TRUE) && (memDC != NULL))
+			{
+				ColB = COLOR.rgbResult;
+				HDC COL2 = GetDC(BrushColor);
+				HBRUSH newBrush = CreateSolidBrush(ColB);
+				RECT RCT;
+				GetClientRect(LineColor, &RCT);
+				FillRect(COL2, &RCT, newBrush);
+				DeleteObject(SelectObject(memDC, newBrush));
+				DeleteObject(SelectObject(hDC, newBrush));
+			}
 			break;
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam);
@@ -721,7 +957,9 @@ LRESULT CALLBACK ItemsBarProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 		break;
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
+		
 	}
+	SetFocus(NULL);
 	return 0;
 }
 
@@ -732,22 +970,24 @@ HMENU MainBar()
 	HMENU Bar = CreateMenu();
 	HMENU File = CreatePopupMenu();
 	AppendMenu(Bar, MF_STRING | MF_POPUP, (UINT)File, _T("Файл"));      // Field "File"
-	AppendMenu(File, MF_STRING, CREATE, _T("Создать"));                 //content of "File"  
+	AppendMenu(File, MF_STRING, CREATE, _T("Создать     (Ctrl+N)"));                 //content of "File"  
 	AppendMenu(File, MF_SEPARATOR, NULL, _T(""));
-	AppendMenu(File, MF_STRING, OPENF, _T("Открыть..."));
+	AppendMenu(File, MF_STRING, OPENF, _T("Открыть...     (Ctrl+O)"));
 	AppendMenu(File, MF_STRING, SAVEF, _T("Сохранить"));
-	AppendMenu(File, MF_STRING, SAVEFA, _T("Сохранить как..."));
+	AppendMenu(File, MF_STRING, SAVEFA, _T("Сохранить как...     (Ctrl+S)"));
 	AppendMenu(File, MF_SEPARATOR, NULL, _T(""));
-	AppendMenu(File, MF_STRING, PRINT, _T("Печать..."));
+	AppendMenu(File, MF_STRING, PRINT, _T("Печать...     (Ctrl+P)"));
 	AppendMenu(File, MF_SEPARATOR, NULL, _T(""));
 	AppendMenu(File, MF_STRING, ABOUT, _T("О Программе..."));
 	AppendMenu(File, MF_SEPARATOR, NULL, _T(""));
-	AppendMenu(File, MF_STRING, EX, _T("Выйти"));                      //content of "File"
+	AppendMenu(File, MF_STRING, EX, _T("Выйти     (Ctrl + F4)"));                      //content of "File"
 	return Bar;
 }
 
 void AllDraw(RECT R, WPARAM wParam, LPARAM lParam , int Kof1, int Kof2 )
 {
+	
+	
 	if ((wParam != MK_LBUTTON))
 	{
 		if (CommandInd != POLYGON)
@@ -958,4 +1198,31 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	}
 	return (INT_PTR)FALSE;
+}
+
+LRESULT CALLBACK ColorProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	int wmId, wmEvent;
+	PAINTSTRUCT ps;
+	HDC hdc;
+	HBRUSH newBrush;
+	switch (message)
+	{
+	
+	case WM_PAINT:
+		hdc = BeginPaint(hWnd, &ps);
+		if (hWnd == LineColor)
+			newBrush = CreateSolidBrush(Col);
+		else
+			newBrush = CreateSolidBrush(ColB);
+			DeleteObject(SelectObject(hdc, newBrush));
+			RECT RCT;
+			GetClientRect(hWnd, &RCT);
+			FillRect(hdc, &RCT, newBrush);
+			EndPaint(hWnd, &ps);
+		break;
+	default:
+		return DefWindowProc(hWnd, message, wParam, lParam);
+	}
+	return 0;
 }
