@@ -18,6 +18,7 @@
 #define IDB_TRIANGEL                   136
 #define IDB_TEXT                137
 #define IDB_POLYGON            138
+#define IDD_ABOUTBOX              107   
 #define IDI_SMALL                       108
 #endif
 // Следующие стандартные значения для новых объектов

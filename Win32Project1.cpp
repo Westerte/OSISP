@@ -4,6 +4,8 @@
 #include "stdafx.h"
 #include "Commctrl.h"
 #include "Win32Project1.h"
+#include "Commdlg.h"
+#include "Windows.h"
 
 #define MAX_LOADSTRING 100
 #define CREATE 1          //Create         Main menu comands
@@ -33,7 +35,8 @@ TCHAR szTitle[MAX_LOADSTRING];					// Текст строки заголовка
 TCHAR szWindowClass[MAX_LOADSTRING];			// имя класса главного окна
 TCHAR szMainBar[MAX_LOADSTRING] = _T("MainBar");
 HWND TextWnd;
-
+LPENHMETAHEADER Header;
+PRINTDLG pd;
 
 int CommandInd = 0;
 int x, y;
@@ -41,11 +44,12 @@ int a, b;
 int bx = -1, by = -1;
 HBITMAP hbmp;
 HDC hDC;
-HDC memDC;
+HDC memDC = NULL;
 int height, width;
 RECT DrawAreaClientRect, DrawAreaRect ,R;
 HGDIOBJ OldBrush;
 HGDIOBJ OldPen;
+TCHAR fileName[MAX_PATH] = _T("");
 
 // Отправить объявления функций, включенных в этот модуль кода:
 ATOM            RegisterItemsBar(HINSTANCE hInstance);
@@ -60,10 +64,12 @@ void DrawCircle(int x, int y, int a, int b);
 void DrawEllipse(int x, int y, int a, int b);
 void DrawTriangle(int x, int y, int a, int b);
 void DrawTextT(int x, int y, int a, int b);
+void SaveSomeFile(HDC dc, int width, int height);
 
 LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK	DrawProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK	ItemsBarProc(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 
 HMENU MainBar();
 
@@ -249,6 +255,13 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	   107, 39, 33, 33, ItemsBar, (HMENU)TEXT, hInstance, NULL);
    PI = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_TEXT));
    SendMessage(TextBut, BM_SETIMAGE, IMAGE_BITMAP, (LPARAM)PI);
+
+   HWND hWndComboBox = CreateWindow(WC_COMBOBOX,NULL,
+	   CBS_DROPDOWN | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VISIBLE,
+	   150, 6, 120, 20, ItemsBar, NULL, hInstance,
+	   NULL);
+   SendMessage(hWndComboBox, CB_ADDSTRING, (WPARAM)0, (LPARAM));
+
    
    if (!hWnd)
    {
@@ -301,6 +314,26 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		switch (wmId)
 		{
 		case CREATE:     //Drawing area creating
+			if (memDC != NULL)
+			{
+				ReleaseDC(DrawArea, hDC);
+				ReleaseDC(DrawArea, memDC);
+				DestroyWindow(DrawArea);
+				hDC = NULL;
+				memDC = NULL;
+				DrawArea = NULL;
+				if (TextWnd != NULL)
+				{
+					DestroyWindow(TextWnd);
+					TextWnd = NULL;
+				}
+				if (bx != -1)
+				{
+					bx = -1;
+					by = -1;
+				}
+				fileName[0] = '\0';
+			}
 			DrawArea = CreateWindow(_T("DrawAria"), NULL, WS_CHILD, 8 , 85, 700, 500, hWnd, NULL, hInst, NULL);
 			hDC = GetDC(DrawArea);
 			memDC = CreateCompatibleDC(hDC);
@@ -321,14 +354,134 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			ShowWindow(DrawArea, SW_SHOW);
 			break;
 		case OPENF:       //Processing open file
+			if (memDC != NULL)
+			{
+				ReleaseDC(DrawArea, hDC);
+				ReleaseDC(DrawArea, memDC);
+				DestroyWindow(DrawArea);
+				hDC = NULL;
+				memDC = NULL;
+				DrawArea = NULL;
+				if (TextWnd != NULL)
+				{
+					DestroyWindow(TextWnd);
+					TextWnd = NULL;
+				}
+				if (bx != -1)
+				{
+					bx = -1;
+					by = -1;
+				}
+			}
+			
+			OPENFILENAME ofn;
+			
+			RECTL HeaderRect;
+			*fileName = 0;
+			HMETAFILE h;
+			memset(&ofn, 0, sizeof(OPENFILENAME));
+			ofn.lStructSize = sizeof(OPENFILENAME);
+			ofn.hwndOwner = NULL;
+			ofn.lpstrFile = fileName;
+			ofn.nMaxFile = sizeof(fileName);
+			ofn.lpstrFilter = _T(".emf\0*.emf");
+			ofn.nFilterIndex = 1;
+			ofn.lpstrTitle = _T("ОТКРЫТЬ");
+			ofn.lpstrInitialDir = _T("c:\\windows");
+			ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
+
+			if (GetOpenFileName(&ofn))
+			{
+				HENHMETAFILE h = GetEnhMetaFile(ofn.lpstrFile);
+				int siz = GetEnhMetaFileHeader(h, 0, NULL);
+				Header = (LPENHMETAHEADER)GlobalAlloc(0, siz);
+				GetEnhMetaFileHeader(h, siz, Header);
+				DrawArea = CreateWindow(_T("DrawAria"), NULL, WS_CHILD, 8, 85, Header->rclBounds.right + 1,
+					Header->rclBounds.bottom + 1, hWnd, NULL, hInst, NULL);
+				hDC = GetDC(DrawArea);
+				memDC = CreateCompatibleDC(hDC);
+				GetWindowRect(DrawArea, &DrawAreaRect);
+				GetClientRect(DrawArea, &DrawAreaClientRect);
+				height = DrawAreaClientRect.bottom;
+				width = DrawAreaClientRect.right;
+				hbmp = CreateCompatibleBitmap(hDC, width, height);
+				hBrush = CreateSolidBrush(RGB(255, 255, 255));
+				hOldbmp = SelectObject(memDC, hbmp);
+				FillRect(memDC, &DrawAreaClientRect, hBrush);
+				newPen = CreatePen(PS_SOLID, 2, RGB(0, 0, 0));
+				PreBrush.lbStyle = BS_HOLLOW;
+				newBrush = CreateBrushIndirect(&PreBrush);
+				OldBrush = SelectObject(hDC, newBrush);
+				DeleteObject(SelectObject(memDC, newPen));
+				OldPen = SelectObject(hDC, newPen);
+				PlayEnhMetaFile(memDC, h, &DrawAreaClientRect);
+				BitBlt(hDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
+				DeleteEnhMetaFile(h);
+				ShowWindow(DrawArea, SW_SHOW);
+			}
+			else
+			{
+				ReleaseDC(DrawArea, hDC);
+				ReleaseDC(DrawArea, memDC);
+				DestroyWindow(DrawArea);
+				hDC = NULL;
+				memDC = NULL;
+				DrawArea = NULL;
+
+			}
+			
 			break;        
 		case SAVEF:       //Processing save file
+			if (memDC != NULL)
+				if (fileName[0] == '\0')
+				{
+					SaveSomeFile(memDC, width, height);
+				}
+				else
+				{
+					HDC Meta = CreateEnhMetaFile(memDC, fileName, NULL, NULL);
+					BitBlt(Meta, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
+					HENHMETAFILE h = CloseEnhMetaFile(Meta);
+					DeleteEnhMetaFile(h);
+				}
 			break;
 		case SAVEFA:     //Processing save file ass
+			if (memDC != NULL)
+			SaveSomeFile(memDC, width, height);
 			break;
 		case PRINT:      //Processing print 
+			if (memDC != NULL)
+			{
+
+				ZeroMemory(&pd, sizeof(pd));
+				pd.lStructSize = sizeof(pd);
+				pd.hwndOwner = hWnd;
+				pd.hDevMode = NULL;
+				pd.hDevNames = NULL;
+				pd.Flags = PD_RETURNDC | PD_NOSELECTION | PD_PRINTTOFILE | PD_NOPAGENUMS;
+				pd.nMinPage = 1;
+				pd.nMaxPage = 1;
+				pd.nCopies = 1;
+				if (PrintDlg(&pd) == TRUE)
+				{
+					DOCINFO doc;
+					GlobalUnlock(pd.hDevMode);
+					DEVNAMES * pdn = (DEVNAMES *)GlobalLock(pd.hDevNames);
+					ZeroMemory(&doc, sizeof(doc));
+					doc.cbSize = sizeof(doc);
+					doc.lpszDatatype = _T("RAW");
+					doc.lpszOutput = (TCHAR *)pdn + pdn->wOutputOffset;
+					int lol = StartDoc(pd.hDC, &doc);
+					StartPage(pd.hDC);
+					BitBlt(pd.hDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
+					EndPage(pd.hDC);
+					EndDoc(pd.hDC);
+					DeleteDC(pd.hDC);
+				}
+			}
 			break;
 		case ABOUT:        //Processing about
+			DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
 			break;
 		case EX:          //Processing exit
 			DestroyWindow(hWnd);
@@ -483,9 +636,6 @@ LRESULT CALLBACK	 DrawProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 			
 		}
 		break;
-	case WM_DESTROY:
-		PostQuitMessage(0);
-		break;
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
 	}
@@ -584,9 +734,9 @@ HMENU MainBar()
 	AppendMenu(Bar, MF_STRING | MF_POPUP, (UINT)File, _T("Файл"));      // Field "File"
 	AppendMenu(File, MF_STRING, CREATE, _T("Создать"));                 //content of "File"  
 	AppendMenu(File, MF_SEPARATOR, NULL, _T(""));
-	AppendMenu(File, MF_STRING, SAVEF, _T("Открыть..."));
+	AppendMenu(File, MF_STRING, OPENF, _T("Открыть..."));
 	AppendMenu(File, MF_STRING, SAVEF, _T("Сохранить"));
-	AppendMenu(File, MF_STRING, SAVEF, _T("Сохранить как...")); 
+	AppendMenu(File, MF_STRING, SAVEFA, _T("Сохранить как..."));
 	AppendMenu(File, MF_SEPARATOR, NULL, _T(""));
 	AppendMenu(File, MF_STRING, PRINT, _T("Печать..."));
 	AppendMenu(File, MF_SEPARATOR, NULL, _T(""));
@@ -749,4 +899,63 @@ void DrawTextT(int x, int y, int a, int b)
 	if (x < a && y < b)
 	Rectangle(hDC, x, y, a, b);
 	DeleteObject(SelectObject(hDC, (HPEN)OldPen));
+}
+
+void SaveSomeFile(HDC dc, int width, int height)
+{
+	OPENFILENAME ofn;
+	*fileName = 0;
+
+	memset(&ofn, 0, sizeof(OPENFILENAME));
+	ofn.lStructSize = sizeof(OPENFILENAME);
+	ofn.hwndOwner = NULL;
+	ofn.lpstrFile = fileName;
+	ofn.nMaxFile = sizeof(fileName);
+	ofn.lpstrFilter = _T(".emf\0*.emf");
+	ofn.nFilterIndex = 0;//
+	ofn.lpstrTitle = _T("СОХРАНИТЬ КАК");
+	ofn.lpstrInitialDir = _T("c:\\windows");
+	ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
+	HDC Meta;
+	if (GetSaveFileName(&ofn))
+	{
+		int i = 0;
+		while (fileName[i] != '\0')
+			i++;
+		if ((fileName[i - 1] != 'f') && (fileName[i - 2] != 'm') &&
+			(fileName[i - 3] != 'e') && (fileName[i - 4] != '.'))
+		{
+
+			fileName[i] = '.';
+			fileName[i + 1] = 'e';
+			fileName[i + 2] = 'm';
+			fileName[i + 3] = 'f';
+			fileName[i + 4] = '\0';
+		}
+		Meta = CreateEnhMetaFile(dc, fileName, NULL, NULL);
+		BitBlt(Meta, 0, 0, width, height, dc, 0, 0, SRCCOPY);
+		HENHMETAFILE h = CloseEnhMetaFile(Meta);
+		DeleteEnhMetaFile(h);
+	}
+
+	return;
+}
+
+INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	UNREFERENCED_PARAMETER(lParam);
+	switch (message)
+	{
+	case WM_INITDIALOG:
+		return (INT_PTR)TRUE;
+
+	case WM_COMMAND:
+		if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
+		{
+			EndDialog(hDlg, LOWORD(wParam));
+			return (INT_PTR)TRUE;
+		}
+		break;
+	}
+	return (INT_PTR)FALSE;
 }
