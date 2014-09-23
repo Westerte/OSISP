@@ -30,6 +30,7 @@
 #define COMBOX 18
 #define LABEL2 19
 #define LABEL3 20
+#define POLYLINE 21
 
 
 // √лобальные переменные:
@@ -134,7 +135,7 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	acc[3].cmd = PRINT;
 	acc[3].fVirt = FVIRTKEY | FCONTROL;
 	acc[3].key = 0x50;
-	acc[4].cmd = SAVEFA;
+	acc[4].cmd = SAVEF;
 	acc[4].fVirt = FVIRTKEY | FCONTROL;
 	acc[4].key = 0x53;
 	hAccelTable = CreateAcceleratorTable((LPACCEL)acc, 5);
@@ -332,6 +333,12 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	   107, 39, 33, 33, ItemsBar, (HMENU)TEXT, hInstance, NULL);
    PI = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_TEXT));
    SendMessage(TextBut, BM_SETIMAGE, IMAGE_BITMAP, (LPARAM)PI);
+
+   HWND PolyBut = CreateWindow(_T("BUTTON"), NULL, WS_CHILD | BS_BITMAP | BS_FLAT,
+	   141, 5, 33, 33, ItemsBar, (HMENU)POLYLINE, hInstance, NULL);
+   PI = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_POLYLINE));
+   SendMessage(PolyBut, BM_SETIMAGE, IMAGE_BITMAP, (LPARAM)PI);
+
    HWND label = CreateWindow(_T("static"), _T("Ўирина линии:"),
 	   WS_CHILD | WS_VISIBLE | WS_TABSTOP,
 	   195, 5, 120, 23,
@@ -384,6 +391,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    ShowWindow(TriangelBut, nCmdShow);
    ShowWindow(PolygonBut, nCmdShow);
    ShowWindow(TextBut, nCmdShow);
+   ShowWindow(PolyBut, nCmdShow);
    ShowWindow(label2, nCmdShow);
    ShowWindow(label3, nCmdShow);
    ShowWindow(LineColor, nCmdShow);
@@ -668,7 +676,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				ShowWindow(TextWnd, SW_SHOW);
 			}
 		}
-		if ((CommandInd != TEXT) && (TextWnd == NULL) && (CommandInd != POLYGON))
+		if ((CommandInd != TEXT) && (TextWnd == NULL) && (CommandInd != POLYGON) && (CommandInd != POLYLINE))
 			BitBlt(dubmemDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
 		break;
 	case WM_MOUSEWHEEL:
@@ -799,7 +807,7 @@ LRESULT CALLBACK	 DrawProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 		break;
 	case WM_PAINT:
 		hdc = BeginPaint(hWnd, &ps);
-		BitBlt(hdc, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
+		BitBlt(hdc, 0, 0, width, height, dubmemDC, 0, 0, SRCCOPY);
 		EndPaint(hWnd, &ps);
 		break;
 	case WM_MOUSEMOVE:
@@ -850,6 +858,16 @@ LRESULT CALLBACK	 DrawProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 			TextWnd = NULL;
 			UpdateWindow(DrawArea);
 		}
+			if (CommandInd == POLYLINE)
+			{
+				if (bx != -1)
+				{
+					MoveToEx(dubmemDC, x, y, NULL);
+					LineTo(dubmemDC, a, b);
+					bx = by = -1;
+				}
+			}
+		
 		break;
 	case WM_LBUTTONDOWN:
 		if (CommandInd == POLYGON)
@@ -881,6 +899,25 @@ LRESULT CALLBACK	 DrawProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 				}
 			}
 			
+		}
+		if (CommandInd == POLYLINE)
+		{
+			if (bx == -1)
+			{
+				bx = x = LOWORD(lParam);
+				by = y = HIWORD(lParam);
+
+			}
+			else
+			{
+					a = LOWORD(lParam);
+					b = HIWORD(lParam);
+					MoveToEx(dubmemDC, x, y, NULL);
+					LineTo(dubmemDC, a, b);
+					x = a;
+					y = b;
+			}
+
 		}
 		k = 1;
 		x_k = 0;
@@ -938,6 +975,9 @@ LRESULT CALLBACK ItemsBarProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 			break;
 		case TEXT:
 			CommandInd = TEXT;
+			break;
+		case POLYLINE:
+			CommandInd = POLYLINE;
 			break;
 		case COMBOX:
 			index = SendMessage(hWndComboBox, CB_GETCURSEL, 0, 0);
@@ -1019,7 +1059,7 @@ LRESULT CALLBACK ItemsBarProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 				ShowWindow(TextWnd, SW_SHOW);
 			}
 		}
-		if ((CommandInd != TEXT) && (TextWnd == NULL) && (CommandInd != POLYGON))
+		if ((CommandInd != TEXT) && (TextWnd == NULL) && (CommandInd != POLYGON) && (CommandInd != POLYLINE))
 			BitBlt(dubmemDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
 		break;
 	default:
@@ -1056,7 +1096,7 @@ void AllDraw(RECT R, WPARAM wParam, LPARAM lParam , int Kof1, int Kof2 )
 	
 	if ((wParam != MK_LBUTTON))
 	{
-		if (CommandInd != POLYGON)
+		if ((CommandInd != POLYGON)&&(CommandInd != POLYLINE))
 		{
 			x = LOWORD(lParam) - Kof1;
 			y = HIWORD(lParam) - Kof2;
