@@ -6,6 +6,7 @@
 #include "Win32Project1.h"
 #include "Commdlg.h"
 #include "Wingdi.h"
+#include "Math.h"
 
 #define MAX_LOADSTRING 100
 #define CREATE 1          //Create         Main menu comands
@@ -42,18 +43,20 @@ TCHAR szMainBar[MAX_LOADSTRING] = _T("MainBar");
 HWND TextWnd;
 LPENHMETAHEADER Header;
 PRINTDLG pd;
-HWND hWndComboBox;
+HWND hWndComboBox, MainWind;
 COLORREF Col = RGB(0, 0, 0);
 COLORREF ColB = RGB(255, 255, 255);
 int index;
-HWND LineColor, BrushColor;
+HWND LineColor, BrushColor, ClockWind;
+HDC hCompitableDC = NULL;
+
 
 int CommandInd = 0;
 int x, y;
 int a, b;
 int bx = -1, by = -1;
 HBITMAP hbmp;
-HDC hDC;
+HDC hDC, ClockDC, dubmemDC;
 HDC memDC = NULL;
 int height, width;
 RECT DrawAreaClientRect, DrawAreaRect ,R;
@@ -63,14 +66,16 @@ TCHAR fileName[MAX_PATH] = _T("");
 HWND label2;
 HWND label3;
 int x_k = 0, y_k = 0;
-
+SYSTEMTIME st;
 // Отправить объявления функций, включенных в этот модуль кода:
 ATOM            RegisterItemsBar(HINSTANCE hInstance);
 ATOM            RegisterDrawingWind(HINSTANCE hInstance);
 ATOM				MyRegisterClass(HINSTANCE hInstance);
 ATOM RegisterColorsWindows(HINSTANCE hInstance);
+ATOM RegisterClockWind(HINSTANCE hInstance);
 BOOL				InitInstance(HINSTANCE, int);
 void AllDraw(RECT R, WPARAM wParam, LPARAM lParam, int Kof1, int Kof2);
+
 void PencilDrawing(int a, int b);
 void DrawLine(int x, int y, int a, int b);
 void DrawRectangle(int x, int y, int a, int b);
@@ -85,6 +90,7 @@ LRESULT CALLBACK	DrawProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK	ItemsBarProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK ColorProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+LRESULT CALLBACK ClockProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 HMENU MainBar();
 
 
@@ -107,6 +113,7 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
   	RegisterDrawingWind(hInstance);       //Drawing area inicialization
 	MyRegisterClass(hInstance);			//Main Window inicialization
 	RegisterColorsWindows(hInstance);
+	RegisterClockWind(hInstance);
 	// Выполнить инициализацию приложения:
 	if (!InitInstance (hInstance, nCmdShow))
 	{
@@ -120,7 +127,7 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	acc[0].key = 0x4E;
 	acc[1].cmd = EX;
 	acc[1].fVirt = FVIRTKEY | FCONTROL;
-	acc[1].key = VK_F4;
+	acc[1].key = 0x51;
 	acc[2].cmd = OPENF;
 	acc[2].fVirt = FVIRTKEY | FCONTROL;
 	acc[2].key = 0x4F;
@@ -140,7 +147,7 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	
 	while (GetMessage(&msg, NULL, 0, 0))
 	{
-		if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
+		if (!TranslateAccelerator(MainWind, hAccelTable, &msg))
 		{
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
@@ -179,6 +186,25 @@ ATOM RegisterDrawingWind(HINSTANCE hInstance)
 	return RegisterClassEx(&DrawArea);
 }
 
+ATOM RegisterClockWind(HINSTANCE hInstance)
+{
+	WNDCLASSEX DrawArea;
+
+	DrawArea.cbSize = sizeof(WNDCLASSEX);
+	DrawArea.style = CS_HREDRAW | CS_VREDRAW;
+	DrawArea.lpfnWndProc = ClockProc;
+	DrawArea.cbClsExtra = 0;
+	DrawArea.cbWndExtra = 0;
+	DrawArea.hInstance = hInstance;
+	DrawArea.hIcon = NULL;
+	DrawArea.hCursor = LoadCursor(NULL, IDC_ARROW);
+	DrawArea.hbrBackground = (HBRUSH)(6);
+	DrawArea.lpszMenuName = NULL;
+	DrawArea.lpszClassName = _T("ClockWind");
+	DrawArea.hIconSm = NULL;
+
+	return RegisterClassEx(&DrawArea);
+}
 //Items Bar inicialization
 ATOM RegisterItemsBar(HINSTANCE hInstance)
 {
@@ -261,7 +287,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
  
    hInst = hInstance; // Сохранить дескриптор экземпляра в глобальной переменной
    
-   hWnd = CreateWindow(szWindowClass, _T("WPaintLight"), WS_OVERLAPPEDWINDOW,
+   MainWind = hWnd = CreateWindow(szWindowClass, _T("WPaintLight"), WS_OVERLAPPEDWINDOW,
 	   CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, MainBar() , hInstance, NULL);
 
    GetClientRect(hWnd, &R);                                                                                      //Function to getting window size                                                            
@@ -380,13 +406,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	
 	int wmId, wmEvent;
 	PAINTSTRUCT ps;
-	HDC hdc;
 	HGDIOBJ hOldbmp;
 	HBRUSH hBrush, newBrush;
 	HPEN newPen;
 	LOGBRUSH PreBrush;
 	int delta;
-	
+	HDC hdc;
+	RECT RCT;
+	GetClientRect(hWnd, &RCT);
+	int mx0 = 90, my0 = 4;
 
 	switch (message)
 	{
@@ -398,6 +426,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		switch (wmId)
 		{
 		case CREATE:     //Drawing area creating
+			
+			SetTimer(hWnd, 1, 200, 0);
 			k = 1;
 			Col = RGB(0, 0, 0);
 			ColB = RGB(255, 255, 255);
@@ -407,6 +437,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			InvalidateRect(BrushColor, &RCT, FALSE);
 			if (memDC != NULL)
 			{
+				KillTimer(hWnd, 1);
 				ReleaseDC(DrawArea, hDC);
 				ReleaseDC(DrawArea, memDC);
 				DestroyWindow(DrawArea);
@@ -425,32 +456,43 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				}
 				fileName[0] = '\0';
 			}
-			DrawArea = CreateWindow(_T("DrawAria"), NULL, WS_CHILD, 8 , 85, 700, 500, hWnd, NULL, hInst, NULL);
+			
+			DrawArea = CreateWindow(_T("DrawAria"), NULL, WS_CHILD|WS_CLIPCHILDREN|WS_CLIPSIBLINGS, 8 , 85, 1000, 580, hWnd, NULL, hInst, NULL);
+			ClockWind = CreateWindow(_T("ClockWind"), NULL, WS_CHILD|WS_CLIPCHILDREN | WS_CLIPSIBLINGS, 820, 0, 180, 182, DrawArea, NULL, hInst, NULL);
 			hDC = GetDC(DrawArea);
 			memDC = CreateCompatibleDC(hDC);
+			dubmemDC = CreateCompatibleDC(hDC);
 			GetWindowRect(DrawArea, &DrawAreaRect);
 			GetClientRect(DrawArea, &DrawAreaClientRect);
 			height = DrawAreaClientRect.bottom - DrawAreaClientRect.top;
 			width = DrawAreaClientRect.right - DrawAreaClientRect.left;
 			hbmp = CreateCompatibleBitmap(hDC, width , height);
 			hBrush = CreateSolidBrush(RGB(255, 255, 255));
-			hOldbmp = SelectObject(memDC, hbmp);
+			DeleteObject(SelectObject(memDC, hbmp));
+			hbmp = CreateCompatibleBitmap(memDC, width, height);
+			DeleteObject(SelectObject(dubmemDC, hbmp));
 			FillRect(memDC, &DrawAreaClientRect, hBrush);
+			FillRect(dubmemDC, &DrawAreaClientRect, hBrush);
 			newPen = CreatePen(PS_SOLID, SendMessage(hWndComboBox, CB_GETCURSEL, 0, 0)+1
             , Col);
 			PreBrush.lbStyle = BS_HOLLOW;
 			newBrush = CreateBrushIndirect(&PreBrush);
-		    OldBrush = SelectObject(hDC, newBrush);
+			DeleteObject(SelectObject(hDC, newBrush));
+			DeleteObject(SelectObject(memDC, newBrush));
 			DeleteObject(SelectObject(memDC, newPen));
-			OldPen = SelectObject(hDC, newPen);
+			DeleteObject(SelectObject(hDC, newPen));
+			
 			ShowWindow(DrawArea, SW_SHOW);
+			ShowWindow(ClockWind, SW_SHOW);
 			break;
 		case OPENF:       //Processing open file
 			if (memDC != NULL)
 			{
 				ReleaseDC(DrawArea, hDC);
 				ReleaseDC(DrawArea, memDC);
+				ReleaseDC(DrawArea, dubmemDC);
 				DestroyWindow(DrawArea);
+				DestroyWindow(ClockWind);
 				hDC = NULL;
 				memDC = NULL;
 				DrawArea = NULL;
@@ -495,8 +537,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				int siz = GetEnhMetaFileHeader(h, 0, NULL);
 				Header = (LPENHMETAHEADER)GlobalAlloc(0, siz);
 				GetEnhMetaFileHeader(h, siz, Header);
-				DrawArea = CreateWindow(_T("DrawAria"), NULL, WS_CHILD, 8, 85, Header->rclBounds.right + 1,
+				DrawArea = CreateWindow(_T("DrawAria"), NULL, WS_CHILD | WS_CLIPCHILDREN | WS_CLIPSIBLINGS, 8, 85, Header->rclBounds.right + 1,
 					Header->rclBounds.bottom + 1, hWnd, NULL, hInst, NULL);
+				ClockWind = CreateWindow(_T("ClockWind"), NULL, WS_CHILD | WS_CLIPCHILDREN | WS_CLIPSIBLINGS, 820, 0,
+					180, 182, DrawArea, NULL, hInst, NULL);
+				SetTimer(hWnd, 1, 200, 0);
 				hDC = GetDC(DrawArea);
 				memDC = CreateCompatibleDC(hDC);
 				GetWindowRect(DrawArea, &DrawAreaRect);
@@ -505,8 +550,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				width = DrawAreaClientRect.right;
 				hbmp = CreateCompatibleBitmap(hDC, width, height);
 				hBrush = CreateSolidBrush(RGB(255, 255, 255));
-				hOldbmp = SelectObject(memDC, hbmp);
+				DeleteObject(SelectObject(memDC, hbmp));
+				dubmemDC = CreateCompatibleDC(hDC);
+				hbmp = CreateCompatibleBitmap(memDC, width, height);
+				DeleteObject(SelectObject(dubmemDC, hbmp));
 				FillRect(memDC, &DrawAreaClientRect, hBrush);
+				FillRect(dubmemDC, &DrawAreaClientRect, hBrush);
 				newPen = CreatePen(PS_SOLID, SendMessage(hWndComboBox, CB_GETCURSEL, 0, 0)+1
 					, Col);
 				PreBrush.lbStyle = BS_HOLLOW;
@@ -514,20 +563,26 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				newBrush = CreateBrushIndirect(&PreBrush);
 				OldBrush = SelectObject(hDC, newBrush);
 				DeleteObject(SelectObject(memDC, newPen));
+				DeleteObject(SelectObject(dubmemDC, newPen));
 				OldPen = SelectObject(hDC, newPen);
-				PlayEnhMetaFile(memDC, h, &DrawAreaClientRect);
+				PlayEnhMetaFile(dubmemDC, h, &DrawAreaClientRect);
+				BitBlt(memDC, 0, 0, width, height, dubmemDC, 0, 0, SRCCOPY);
 				BitBlt(hDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
 				DeleteEnhMetaFile(h);
 				ShowWindow(DrawArea, SW_SHOW);
+				ShowWindow(ClockWind, SW_SHOW);
 			}
 			else
 			{
 				ReleaseDC(DrawArea, hDC);
 				ReleaseDC(DrawArea, memDC);
 				DestroyWindow(DrawArea);
+				DestroyWindow(ClockWind);
+				KillTimer(hWnd, 1);
 				hDC = NULL;
 				memDC = NULL;
 				DrawArea = NULL;
+				ClockWind = NULL;
 
 			}
 			
@@ -540,15 +595,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				}
 				else
 				{
-					HDC Meta = CreateEnhMetaFile(memDC, fileName, NULL, NULL);
-					BitBlt(Meta, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
+					HDC Meta = CreateEnhMetaFile(dubmemDC, fileName, NULL, NULL);
+					BitBlt(Meta, 0, 0, width, height, dubmemDC, 0, 0, SRCCOPY);
 					HENHMETAFILE h = CloseEnhMetaFile(Meta);
 					DeleteEnhMetaFile(h);
 				}
 			break;
 		case SAVEFA:     //Processing save file ass
 			if (memDC != NULL)
-			SaveSomeFile(memDC, width, height);
+			SaveSomeFile(dubmemDC, width, height);
 			break;
 		case PRINT:      //Processing print 
 			if (memDC != NULL)
@@ -574,7 +629,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					doc.lpszOutput = (TCHAR *)pdn + pdn->wOutputOffset;
 					int lol = StartDoc(pd.hDC, &doc);
 					StartPage(pd.hDC);
-					BitBlt(pd.hDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
+					BitBlt(pd.hDC, 0, 0, width, height, dubmemDC, 0, 0, SRCCOPY);
 					EndPage(pd.hDC);
 					EndDoc(pd.hDC);
 					DeleteDC(pd.hDC);
@@ -614,7 +669,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			}
 		}
 		if ((CommandInd != TEXT) && (TextWnd == NULL) && (CommandInd != POLYGON))
-			BitBlt(memDC, 0, 0, width, height, hDC, 0, 0, SRCCOPY);
+			BitBlt(dubmemDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
 		break;
 	case WM_MOUSEWHEEL:
 	if ((TextWnd == NULL) && (bx == -1))
@@ -632,7 +687,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						break;
 					}
 					FillRect(hDC, &DrawAreaClientRect, newBrush);
-					StretchBlt(hDC, 0 + x_k, 0 + y_k, width, height, memDC, 0, 0, (int)width*k, (int)height*k, SRCCOPY);
+					StretchBlt(hDC, 0, 0, width, height, memDC, 0 + x_k, 0 + y_k, (int)width*k, (int)height*k, SRCCOPY);
 				}
 				else
 				{
@@ -643,7 +698,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						break;
 					}
 					FillRect(hDC, &DrawAreaClientRect, newBrush);
-					StretchBlt(hDC, 0 + x_k, 0 + y_k, width, height, memDC, 0, 0, (int)width*k, (int)height*k, SRCCOPY);
+					StretchBlt(hDC, 0, 0, width, height, memDC, 0 + x_k, 0 + y_k, (int)width*k, (int)height*k, SRCCOPY);
 				}
 				break;
 			}
@@ -658,7 +713,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						break;
 					}
 					FillRect(hDC, &DrawAreaClientRect, newBrush);
-					StretchBlt(hDC, 0 + x_k, 0 + y_k, width, height, memDC, 0, 0, (int)width*k, (int)height*k, SRCCOPY);
+					StretchBlt(hDC, 0, 0, width, height, memDC, 0 + x_k, 0 + y_k, (int)width*k, (int)height*k, SRCCOPY);
 				}
 				else
 				{
@@ -669,7 +724,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						break;
 					}
 					FillRect(hDC, &DrawAreaClientRect, newBrush);
-					StretchBlt(hDC, 0 + x_k, 0 + y_k, width, height, memDC, 0, 0, (int)width*k, (int)height*k, SRCCOPY);
+					StretchBlt(hDC, 0, 0, width, height, memDC, 0 + x_k, 0 + y_k, (int)width*k, (int)height*k, SRCCOPY);
 				}
 				break;
 			}
@@ -684,7 +739,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 
 					FillRect(hDC, &DrawAreaClientRect, newBrush);
-					StretchBlt(hDC, 0 + x_k, 0 + y_k, width, height, memDC, 0, 0, (int)width*k, (int)height*k, SRCCOPY);
+					StretchBlt(hDC, 0, 0, width, height, memDC, 0 + x_k, 0 + y_k, (int)width*k, (int)height*k, SRCCOPY);
 				}
 				else
 				{
@@ -695,11 +750,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						break;
 					}
 					FillRect(hDC, &DrawAreaClientRect, newBrush);
-					StretchBlt(hDC, 0 + x_k, 0 + y_k, width, height, memDC, 0, 0, (int)width*k, (int)height*k, SRCCOPY);
+					StretchBlt(hDC, 0, 0, width, height, memDC, 0 + x_k, 0 + y_k, (int)width*k, (int)height*k, SRCCOPY);
 				}
 			}
-			break;
-		
+	break;
+	case WM_TIMER:
+		if (memDC != NULL)
+		{
+			GetClientRect(ClockWind, &RCT);
+			InvalidateRect(ClockWind, &RCT, FALSE);
+		}
+		break;
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		break;
@@ -758,7 +819,7 @@ LRESULT CALLBACK	 DrawProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 			}
 		}
 		if ((CommandInd != TEXT) && (TextWnd == NULL) && (CommandInd != POLYGON))
-			BitBlt(memDC, 0, 0, width, height, hDC, 0, 0, SRCCOPY);
+			BitBlt(dubmemDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
 		break;
 
 	case WM_RBUTTONDOWN:
@@ -781,9 +842,10 @@ LRESULT CALLBACK	 DrawProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 				i++;
 			}
 			SetRect(&R, x,y,a,b);
-			SetBkMode(memDC, TRANSPARENT);
-			DrawText(memDC, buf, 1024, &R, DT_LEFT | DT_TOP);
+			SetBkMode(dubmemDC, TRANSPARENT);
+			DrawText(dubmemDC, buf, 1024, &R, DT_LEFT | DT_TOP);
 			DestroyWindow(TextWnd);
+			BitBlt(memDC, 0, 0, width, height, dubmemDC, 0, 0, SRCCOPY);
 			BitBlt(hDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
 			TextWnd = NULL;
 			UpdateWindow(DrawArea);
@@ -802,8 +864,9 @@ LRESULT CALLBACK	 DrawProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 			{
 				if ((abs(bx - a) <= 8) && (abs(by - b) <= 8))
 				{
-					MoveToEx(memDC, x, y, NULL);
-					LineTo(memDC, bx, by);
+					MoveToEx(dubmemDC, x, y, NULL);
+					LineTo(dubmemDC, bx, by);
+					BitBlt(memDC, 0, 0, width, height, dubmemDC, 0, 0, SRCCOPY);
 					BitBlt(hDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
 					bx = by = -1;
 				}
@@ -811,8 +874,8 @@ LRESULT CALLBACK	 DrawProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 				{
 					a = LOWORD(lParam);
 					b = HIWORD(lParam);
-					MoveToEx(memDC, x, y, NULL);
-					LineTo(memDC, a, b);
+					MoveToEx(dubmemDC, x, y, NULL);
+					LineTo(dubmemDC, a, b);
 					x = a;
 					y = b;
 				}
@@ -820,6 +883,8 @@ LRESULT CALLBACK	 DrawProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 			
 		}
 		k = 1;
+		x_k = 0;
+		y_k = 0;
 		break;
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
@@ -827,7 +892,6 @@ LRESULT CALLBACK	 DrawProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 		
 	}
 	return 0;
-	SetFocus(NULL);
 }
 
 //
@@ -880,6 +944,7 @@ LRESULT CALLBACK ItemsBarProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 			if (memDC != 0)
 			{
 				newPen = CreatePen(PS_SOLID, index + 1, Col);
+				DeleteObject(SelectObject(dubmemDC, newPen));
 				DeleteObject(SelectObject(memDC, newPen));
 				DeleteObject(SelectObject(hDC, newPen));
 			}
@@ -899,6 +964,7 @@ LRESULT CALLBACK ItemsBarProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 				GetClientRect(LineColor, &RCT);
 				FillRect(COL1, &RCT, newBrush);
 				newPen = CreatePen(PS_SOLID, index + 1, Col);
+				DeleteObject(SelectObject(dubmemDC, newPen));
 				DeleteObject(SelectObject(memDC, newPen));
 				DeleteObject(SelectObject(hDC, newPen));
 			}
@@ -917,6 +983,7 @@ LRESULT CALLBACK ItemsBarProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 				RECT RCT;
 				GetClientRect(LineColor, &RCT);
 				FillRect(COL2, &RCT, newBrush);
+				DeleteObject(SelectObject(dubmemDC, newBrush));
 				DeleteObject(SelectObject(memDC, newBrush));
 				DeleteObject(SelectObject(hDC, newBrush));
 			}
@@ -953,13 +1020,12 @@ LRESULT CALLBACK ItemsBarProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 			}
 		}
 		if ((CommandInd != TEXT) && (TextWnd == NULL) && (CommandInd != POLYGON))
-			BitBlt(memDC, 0, 0, width, height, hDC, 0, 0, SRCCOPY);
+			BitBlt(dubmemDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
 		break;
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
 		
 	}
-	SetFocus(NULL);
 	return 0;
 }
 
@@ -980,7 +1046,7 @@ HMENU MainBar()
 	AppendMenu(File, MF_SEPARATOR, NULL, _T(""));
 	AppendMenu(File, MF_STRING, ABOUT, _T("О Программе..."));
 	AppendMenu(File, MF_SEPARATOR, NULL, _T(""));
-	AppendMenu(File, MF_STRING, EX, _T("Выйти     (Ctrl + F4)"));                      //content of "File"
+	AppendMenu(File, MF_STRING, EX, _T("Выйти     (Ctrl + Q)"));                      //content of "File"
 	return Bar;
 }
 
@@ -1061,83 +1127,66 @@ void PencilDrawing(int a, int b)
 
 void DrawLine(int x, int y, int a, int b)
 {
-	MoveToEx(hDC, x, y, NULL);
-	LineTo(hDC, a, b);
+	BitBlt(memDC, 0, 0, width, height, dubmemDC, 0, 0, SRCCOPY);
+	MoveToEx(memDC, x, y, NULL);
+	LineTo(memDC, a, b);
 	BitBlt(hDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
-	MoveToEx(hDC, x, y, NULL);
-	LineTo(hDC, a, b);
 }
 
 void DrawRectangle(int x, int y, int a, int b)
 {
-	Rectangle(hDC, x, y, a, b);
+	BitBlt(memDC, 0, 0, width, height, dubmemDC, 0, 0, SRCCOPY);
+	Rectangle(memDC, x, y, a, b);
 	BitBlt(hDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
-	Rectangle(hDC, x, y, a, b);
 }
 
 void DrawCircle(int x, int y, int a, int b)
 {
+
+	BitBlt(memDC, 0, 0, width, height, dubmemDC, 0, 0, SRCCOPY);
 	if ((a > x && b > y) || (a < x && b < y))
-		Ellipse(hDC, x, y, x + (b - y), b );
+		Ellipse(memDC, x, y, x + (b - y), b);
 	else
 		Ellipse(hDC, x, y, a, y - (a - x));
 	BitBlt(hDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
-	if ((a > x && b > y) || (a < x && b < y))
-		Ellipse(hDC, x, y, x + (b - y), b);
-	else
-		Ellipse(hDC, x, y, a, y - (a - x));
 }
 
 void DrawEllipse(int x, int y, int a, int b)
 {
-	Ellipse(hDC, x, y, a, b);
+	BitBlt(memDC, 0, 0, width, height, dubmemDC, 0, 0, SRCCOPY);
+	Ellipse(memDC, x, y, a, b);
 	BitBlt(hDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
-	Ellipse(hDC, x, y, a, b);
 }
 
 void DrawTriangle(int x, int y, int a, int b)
 {
+	BitBlt(memDC, 0, 0, width, height, dubmemDC, 0, 0, SRCCOPY);
 	if (b > y)
-	{	
-		MoveToEx(hDC, x, b, NULL);
-		LineTo(hDC, a, b);
-		LineTo(hDC, x + (a - x) / 2, y);
-		LineTo(hDC, x, b);
+	{
+		MoveToEx(memDC, x, b, NULL);
+		LineTo(memDC, a, b);
+		LineTo(memDC, x + (a - x) / 2, y);
+		LineTo(memDC, x, b);
 	}
 	else
 	{
-		MoveToEx(hDC, a, y, NULL);
-		LineTo(hDC, x, y);
-		LineTo(hDC, a + (x - a) / 2, b);
-		LineTo(hDC, a, y);
+		MoveToEx(memDC, a, y, NULL);
+		LineTo(memDC, x, y);
+		LineTo(memDC, a + (x - a) / 2, b);
+		LineTo(memDC, a, y);
 	}
 	BitBlt(hDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
-	if (b > y)
-	{
-		MoveToEx(hDC, x, b, NULL);
-		LineTo(hDC, a, b);
-		LineTo(hDC, x + (a - x) / 2, y);
-		LineTo(hDC, x, b);
-	}
-	else
-	{
-		MoveToEx(hDC, a, y, NULL);
-		LineTo(hDC, x, y);
-		LineTo(hDC, a + (x - a) / 2, b);
-		LineTo(hDC, a, y);
-	}
 }
 
 void DrawTextT(int x, int y, int a, int b)
 {
 	HGDIOBJ OldPen;
 	HPEN NewPen = CreatePen(PS_DASH, 1, RGB(0,0,0));
-	OldPen = SelectObject(hDC, (HPEN)NewPen);
+	OldPen = SelectObject(memDC, (HPEN)NewPen);
+	BitBlt(memDC, 0, 0, width, height, dubmemDC, 0, 0, SRCCOPY);
 	if (x < a && y < b)
-	Rectangle(hDC, x, y, a, b);
+	Rectangle(memDC, x, y, a, b);
 	BitBlt(hDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
-	if (x < a && y < b)
-	Rectangle(hDC, x, y, a, b);
 	DeleteObject(SelectObject(hDC, (HPEN)OldPen));
 }
 
@@ -1223,6 +1272,93 @@ LRESULT CALLBACK ColorProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 		break;
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
+	}
+	return 0;
+}
+
+
+LRESULT CALLBACK ClockProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	int wmId, wmEvent;
+	PAINTSTRUCT ps;
+	HDC hdc;
+	
+	RECT RCT;
+	GetClientRect(hWnd, &RCT);
+	int mx0 = 90, my0 = 4;
+	HANDLE hbmp;
+	HBRUSH hBrush;
+	HPEN newPen;
+	HBITMAP hBitmap;
+	HBITMAP PI;
+	
+	switch (message)
+	{
+	case WM_COMMAND:
+		wmId = LOWORD(wParam);
+		wmEvent = HIWORD(wParam);
+		// Разобрать выбор в меню:
+		switch (wmId)
+		{
+		case EX:
+
+			break;
+		default:
+			return DefWindowProc(hWnd, message, wParam, lParam);
+		}
+		break;
+	
+	case WM_PAINT:
+		hdc = BeginPaint(hWnd, &ps);
+		
+		PI = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_CLOCK));
+		hCompitableDC = CreateCompatibleDC(hdc);
+		DeleteObject(SelectObject(hCompitableDC, PI));
+		GetLocalTime(&st);
+		newPen = CreatePen(PS_SOLID, 2, RGB(255, 0, 0));
+		DeleteObject(SelectObject(hdc, newPen));
+		BitBlt(hdc, 0, 0, RCT.right, RCT.bottom, hCompitableDC, 0, 0, SRCCOPY);
+		
+		
+		MoveToEx(hdc, 89, 91, NULL);
+		LineTo(hdc, 89 + 88 * sin(3.14F / 30 * st.wSecond), 91 - 88 * cos(3.14F / 30 * st.wSecond));
+
+		newPen = CreatePen(PS_SOLID, 4, RGB(0, 0, 0));
+		DeleteObject(SelectObject(hdc, newPen));
+
+		MoveToEx(hdc, 89, 91, NULL);
+		LineTo(hdc, 89 + 83 * sin(3.14F / 30 * st.wMinute), 91 - 83 * cos(3.14F / 30 * st.wMinute));
+
+		newPen = CreatePen(PS_SOLID, 6, RGB(0, 0, 0));
+		DeleteObject(SelectObject(hdc, newPen));
+
+		MoveToEx(hdc, 88, 91, NULL);
+		LineTo(hdc, 88 + 65 * sin(3.14F / 6 * st.wHour), 88 - 65 * cos(3.14F / 6 * st.wHour));
+		EndPaint(hWnd, &ps);
+		break;
+	case WM_MOUSEMOVE:
+		if ((TextWnd == NULL))
+			AllDraw(DrawAreaClientRect, wParam, lParam, -820, 0);
+		break;
+	case WM_LBUTTONUP:
+		if ((CommandInd == TEXT) && (TextWnd == NULL))
+		{
+			if (x < a && y < b)
+			if ((x >= DrawAreaClientRect.left) && (x <= DrawAreaClientRect.right)
+				&& (y >= DrawAreaClientRect.top) && (y <= DrawAreaClientRect.bottom))
+			{
+				TextWnd = CreateWindow(_T("EDIT"), NULL, WS_CHILD | WS_VISIBLE
+					| WS_BORDER | ES_MULTILINE, x, y, abs(x - a),
+					abs(y - b), DrawArea, (HMENU)EDITCONT, hInst, NULL);
+				ShowWindow(TextWnd, SW_SHOW);
+			}
+		}
+		if ((CommandInd != TEXT) && (TextWnd == NULL) && (CommandInd != POLYGON))
+			BitBlt(dubmemDC, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
+		break;
+	default:
+		return DefWindowProc(hWnd, message, wParam, lParam);
+
 	}
 	return 0;
 }
