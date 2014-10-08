@@ -22,6 +22,7 @@ namespace WorkerDll
 		WORKER_API ~Worker();
 		WORKER_API void appendFn(fn_type fn);
 		WORKER_API bool  isEnable();
+		WORKER_API void  off();
 
 	private:
 		std::condition_variable		cv;
@@ -29,6 +30,7 @@ namespace WorkerDll
 		std::mutex					mutex;
 		std::thread					thread;
 		bool							enabled;
+		bool							go_away;
 
 		WORKER_API void thread_fn();
 	};

@@ -18,15 +18,20 @@ namespace ForemanDll
 	public:
 		FOREMAN_API Foreman(size_t threads);
 		FOREMAN_API ~Foreman();
+		FOREMAN_API void appendToForemanQ(fn_type fn);
+		FOREMAN_API void foreman_off();
 	private:
 
 		FOREMAN_API worker_ptr GetFreeWorker();
-		FOREMAN_API worker_ptr GetFreeWorker();
+		FOREMAN_API void foreman_thread_fn();
 		std::vector<worker_ptr> workers;
 
 		std::condition_variable		foreman_cv;
 		std::queue<fn_type>			foreman_task_queue;
 		std::mutex					foreman_mutex;
 		std::thread					foreman_thread;
+		bool							foreman_go_away;
+
+
 	};
 }
