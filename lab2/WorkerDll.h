@@ -13,8 +13,9 @@
 
 namespace WorkerDll
 {
+	std::mutex			stream_mutex;
 	typedef std::function<void()> fn_type;
-
+	
 	class Worker
 	{
 	public:
@@ -31,7 +32,7 @@ namespace WorkerDll
 		std::thread					thread;
 		bool							enabled;
 		bool							go_away;
-
 		WORKER_API void thread_fn();
 	};
 }
+

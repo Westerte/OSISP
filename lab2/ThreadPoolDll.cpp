@@ -1,22 +1,31 @@
-// ThreadPoolDll.cpp: определяет экспортированные функции для приложения DLL.
-//
-
 #include "stdafx.h"
 #include "ThreadPoolDll.h"
 
 namespace ThreadPoolDll
 {
-	
 
-	ThreadPool::ThreadPool(int threadNum) :foreman_obj(new ForemanDll::Foreman(threadNum))	{}
+	ThreadPool::ThreadPool(int threads)
+	{
+		std::ofstream journal("Journal.txt", std::ofstream::out);
+		journal << "*******WThreadPoolLight App Journal*******\n\n\n" << std::endl;
+		for (int i = 0; i < threads; i++)
+		{
+			worker_ptr pWorker(new WorkerDll::Worker);
+			workers.push_back(pWorker);
+		}
+	}
 	ThreadPool::~ThreadPool(){}
 
-	template<class functionName, class... _ARGS>
-	void ThreadPool::appendFuncToPool(functionName _fn, _ARGS... _args)
+	worker_ptr ThreadPool::GetFreeWorker()
 	{
-		foreman_obj->appendToForemanQ(std::bind(_fn, _args...));
-	}
-
+		worker_ptr pWorker = NULL;
+		for (auto &id : workers)
+		{
+			if (id->isEnable())
+				return id;
+		}
+		return pWorker;
+	};
 }
 
 
