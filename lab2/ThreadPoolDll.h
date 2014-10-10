@@ -24,15 +24,8 @@ namespace ThreadPoolDll
 		template<class _FN, class... _ARGS>
 		void AppendToPool(_FN _fn, _ARGS... _args)
 		{
-			for (;;)
-			{
-				worker_ptr pWorker = GetFreeWorker();
-				if (pWorker != NULL)
-				{
-					pWorker->appendFn(std::bind(_fn, _args...));
-					break;
-				}
-			}
+			worker_ptr pWorker = GetFreeWorker();
+			pWorker->appendFn(std::bind(_fn, _args...));
 		}
 	private:
 		THREADPOOLDLL_API worker_ptr GetFreeWorker();

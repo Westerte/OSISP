@@ -3,13 +3,14 @@
 #include <fstream>
 #include "WorkerDll.h"
 
+
 namespace WorkerDll
 {
-	Worker::Worker()
-		:enabled(true), go_away(false), task_queue(), thread(&Worker::thread_fn, this)
-	{
+	std::mutex        stream_mutex;
 
-	}
+	Worker::Worker()
+		: go_away(false), task_queue(), thread(&Worker::thread_fn, this)
+	{}
 	Worker::~Worker()
 	{
 		off();
@@ -26,7 +27,7 @@ namespace WorkerDll
 
 	bool Worker::isEnable()
 	{
-		return enabled;
+		return task_queue.empty();
 	}
 
 	void Worker::off()
@@ -34,28 +35,32 @@ namespace WorkerDll
 		go_away = true;
 	}
 
-
 	void Worker::thread_fn()
 	{
 		std::ofstream journal("Journal.txt", std::ofstream::app);
 		stream_mutex.lock();
-		journal << "Thread " << std::this_thread::get_id() << " have started processing" << std::endl;
+		journal << "Thread " << std::this_thread::get_id() << " have started" << std::endl;
 		stream_mutex.unlock();
 		while (!go_away)
 		{
 			std::unique_lock<std::mutex> locker(mutex);
 			cv.wait(locker, [&](){ return !task_queue.empty() || go_away; });
-			enabled = false;
 			if (!task_queue.empty())
 			{
+				stream_mutex.lock();
+				journal << "\nThread " << std::this_thread::get_id() << " have got task" << std::endl;
+				stream_mutex.unlock();
 				fn_type fn = task_queue.front();
 				task_queue.pop();
-				locker.unlock();
 				fn();
-				locker.lock();
+				stream_mutex.lock();
+				journal << "\nThread " << std::this_thread::get_id() << " have finished task" << std::endl;
+				stream_mutex.unlock();
 			}
-			enabled = true;
 		}
+		stream_mutex.lock();
+		journal << "Thread " << std::this_thread::get_id() << " have been destroyed" << std::endl;
+		stream_mutex.unlock();
 	}
 
 }

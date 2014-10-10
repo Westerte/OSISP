@@ -1,21 +1,20 @@
 #ifdef WORKER_EXPORTS
 #define WORKER_API __declspec(dllexport) 
 #else
-#define WORKER_API __declspec(dllimport) 
+#define WORKER_API 
 #endif
 
+#include <condition_variable>
 #include <queue>
 #include <functional>
 #include <thread>
 #include <mutex>
 #include <memory>
-#include <condition_variable>
 
 namespace WorkerDll
 {
-	std::mutex			stream_mutex;
+	extern std::mutex        stream_mutex;
 	typedef std::function<void()> fn_type;
-	
 	class Worker
 	{
 	public:
@@ -32,6 +31,7 @@ namespace WorkerDll
 		std::thread					thread;
 		bool							enabled;
 		bool							go_away;
+
 		WORKER_API void thread_fn();
 	};
 }
