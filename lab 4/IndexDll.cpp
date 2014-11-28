@@ -2,7 +2,7 @@
 //
 
 #include "stdafx.h"
-const int t = 4;
+const int t = 2;
 typedef struct Abonent
 {
 	char secondName[255];
@@ -22,7 +22,7 @@ typedef struct TNode
 	int keyNumber;
 	bool isLeaf;
 	TKey keyArray[2 * t - 1];
-	TNode* childrenArray[2*t - 1];
+	TNode* childrenArray[2*t];
 };
 
 typedef struct TT
@@ -35,6 +35,7 @@ typedef struct TT
 TT* BTree = new TT;
 void CreateBTree(TT* T);
 void BTreeInsert(TT *T, TKey* k);
+int BTreeDelete(TNode* x, char* key);
 void BTreeSearch(TNode* x, char* key, TNode* resultNode, int* resultIndex);
 
 
@@ -56,6 +57,11 @@ extern "C" __declspec(dllexport) void __stdcall DataBaseInsert(char secondName[2
 		strcpy(k->key, secondName);
 		BTreeInsert(BTree, k);
 	}
+}
+
+extern "C" __declspec(dllexport) void __stdcall DataBaseDelete(char secondName[255])
+{
+	BTreeDelete(BTree->root, secondName);
 }
 
 extern "C" __declspec(dllexport) void __stdcall DataBaseSearch(char secondName[255])
@@ -133,17 +139,16 @@ void BTreeInsert(TT *T, TKey* k)
 	TNode* root = T->root;
 	if (root->keyNumber == 2 * t - 1)
 	{
-		root->isLeaf = true;
 		TNode* s = new TNode;
+		T->root = s;
 		s->isLeaf = false;
 		s->keyNumber = 0;
 		s->childrenArray[0] = root;
-		T->root = s;
-		BTreeSplitChild(T->root, 0);
-		BTreeInsertNonFull(T->root, k);
+		BTreeSplitChild(s, 0);
+		BTreeInsertNonFull(s, k);
 	}
 	else
-		BTreeInsertNonFull(T->root, k);
+		BTreeInsertNonFull(root, k);
 }
 
 void BTreeSearch(TNode* x, char* key, TNode* resultNode, int* resultIndex)
@@ -262,12 +267,31 @@ int BTreeDelete(TNode* x, char* key)
 					}
 					else
 					{
-						
+						if (i == 0)
+							i++;
+						TNode* y = x->childrenArray[i];
+						TNode* z = x->childrenArray[i + 1];
+						y->keyArray[y->keyNumber] = x->keyArray[i];
+						int j;
+						for (j = 0; j < z->keyNumber; j++)
+						{
+							y->keyArray[y->keyNumber + 1 + j] = z->keyArray[j];
+							y->childrenArray[y->keyNumber + 1 + j] = z->childrenArray[j];
+						}
+						y->childrenArray[y->keyNumber + 2 + j] = z->childrenArray[j + 1];
+						y->keyNumber = 2 * t - 1;
+						//delete z;
+						for (int j = i; j < x->keyNumber - 1; j++)
+							x->keyArray[j] = x->keyArray[j + 1];
+						for (int j = i + 1; j < x->keyNumber; j++)
+							x->childrenArray[j] = x->childrenArray[j + 1];
+						x->keyNumber--;
 					}
 				}
+				BTreeDelete(x->childrenArray[i], key);
 			}
 			else
-				BTreeDelete(x->childrenArray[i], key);
+				BTreeDelete(x->childrenArray[i + 1], key);
 		}
 	}
 	return 1;
