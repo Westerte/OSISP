@@ -182,7 +182,7 @@ int BTreeDelete(TNode* x, char* key)
 	{
 		if (i >= 0 && strcmp(key, x->keyArray[i].key) == 0)
 		{
-			delete &x->keyArray[i];
+			//delete x->childrenArray[i];
 			while (i < x->keyNumber - 1)
 			{
 				x->keyArray[i] = x->keyArray[i + 1];
@@ -202,14 +202,14 @@ int BTreeDelete(TNode* x, char* key)
 			if (x->childrenArray[i]->keyNumber > t - 1)
 			{
 				x->keyArray[i] = y->keyArray[y->keyNumber - 1];
-				BTreeDelete(y, key);
+				BTreeDelete(y, y->keyArray[y->keyNumber - 1].key);
 			}
 			else
 			{
 				if (z->keyNumber > t - 1)
 				{
-					x->keyArray[i+1] = z->keyArray[0];
-					BTreeDelete(z, key);
+					x->keyArray[i] = z->keyArray[0];
+					BTreeDelete(z, z->keyArray[0].key);
 				}
 				else
 				{
@@ -228,7 +228,7 @@ int BTreeDelete(TNode* x, char* key)
 					for (int j = i + 1; j < x->keyNumber; j++)
 						x->childrenArray[j] = x->childrenArray[j + 1];
 					x->keyNumber--;
-					BTreeDelete(y, key);
+					BTreeDelete(y, x->childrenArray[i]->keyArray[t-1].key);
 				}
 			}
 		}
@@ -267,7 +267,7 @@ int BTreeDelete(TNode* x, char* key)
 					}
 					else
 					{
-						if (i == 0)
+						if (i == -1)
 							i++;
 						TNode* y = x->childrenArray[i];
 						TNode* z = x->childrenArray[i + 1];
@@ -278,7 +278,7 @@ int BTreeDelete(TNode* x, char* key)
 							y->keyArray[y->keyNumber + 1 + j] = z->keyArray[j];
 							y->childrenArray[y->keyNumber + 1 + j] = z->childrenArray[j];
 						}
-						y->childrenArray[y->keyNumber + 2 + j] = z->childrenArray[j + 1];
+						y->childrenArray[y->keyNumber + 1 + j] = z->childrenArray[j];
 						y->keyNumber = 2 * t - 1;
 						//delete z;
 						for (int j = i; j < x->keyNumber - 1; j++)
