@@ -3,11 +3,10 @@
 
 #include "stdafx.h"
 #include "PhoneDataBase.h"
+#include <vector>
+#include <string>
 
 #define MAX_LOADSTRING 100
-#define SURNAME_BUTTON 200
-#define ADRESS_BUTTON 201
-#define TELEPHONE_BUTTON 202
 #define RESULT_BUTTON 203
 #define SURNAME_EDIT 204
 #define ADRESS_EDIT 205
@@ -161,11 +160,6 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	hSurnameEdit = CreateWindowEx(WS_EX_CLIENTEDGE, L"edit", L"hSurnameEdit", WS_CHILD | WS_VISIBLE | ES_LEFT,
 		x + 100, y, w + 50, h, hWnd, (HMENU)SURNAME_EDIT, hInstance, NULL);
 	SetWindowText(hSurnameEdit, L"");
-
-	hFindSurnameButton = CreateWindow(L"button", L"hFindSurnameButton", WS_CHILD | WS_VISIBLE,
-		x + 250, y, w + 90, h, hWnd, (HMENU)SURNAME_BUTTON, hInstance, NULL);
-	SetWindowText(hFindSurnameButton, L"Find Surname");
-
 	y = 40;
 
 	hAdressCheckBox = CreateWindow(L"button", L"hAdressCheckBox", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
@@ -177,11 +171,6 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	hAdressEdit = CreateWindowEx(WS_EX_CLIENTEDGE, L"edit", L"hAdressEdit", WS_CHILD | WS_VISIBLE | ES_LEFT | ES_AUTOHSCROLL,
 		x + 100, y, w + 50, h, hWnd, (HMENU)ADRESS_EDIT, hInstance, NULL);
 	SetWindowText(hAdressEdit, L"");
-
-	hFindAdressButton = CreateWindow(L"button", L"hFindAdressButton", WS_CHILD | WS_VISIBLE,
-		x + 250, y, w + 90, h, hWnd, (HMENU)ADRESS_BUTTON, hInstance, NULL);
-	SetWindowText(hFindAdressButton, L"Find Adress");
-
 	y = 70;
 
 	hTelephoneCheckBox = CreateWindow(L"button", L"hTelephoneCheckBox", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
@@ -194,15 +183,11 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 		x + 100, y, w + 50, h, hWnd, (HMENU)TELEPHONE_EDIT, hInstance, NULL);
 	SetWindowText(hTelephoneEdit, L"");
 
-	hFindTelephoneButton = CreateWindow(L"button", L"hFindTelephoneButton", WS_CHILD | WS_VISIBLE,
-		x + 250, y, w + 90, h, hWnd, (HMENU)TELEPHONE_BUTTON, hInstance, NULL);
-	SetWindowText(hFindTelephoneButton, L"Find Telephone");
-
 	y = 100;
 
 	hFindAllButton = CreateWindow(L"button", L"hFindAllButton", WS_CHILD | WS_VISIBLE,
-		x - 20, y, w + 360, h, hWnd, (HMENU)RESULT_BUTTON, hInstance, NULL);
-	SetWindowText(hFindAllButton, L"Find Results");
+		x - 20, y, w + 170, h, hWnd, (HMENU)RESULT_BUTTON, hInstance, NULL);
+	SetWindowText(hFindAllButton, L"Find Abonent");
 
 	y = 130;
 
@@ -243,7 +228,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	int wmId, wmEvent;
 	PAINTSTRUCT ps;
 	HDC hdc;
-
+	std::vector<char*> resultsVector;
+	char *result;
 	switch (message)
 	{
 	case WM_COMMAND:
@@ -251,7 +237,18 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		wmEvent = HIWORD(wParam);
 
 		char* input;
+		char* secondName;
+		char* adress;
+		char* phoneNumber;
 		char ***abonentsArray;
+		
+		HWND hwndSurname;
+		LRESULT resSurname;
+		HWND hwndAdress;
+		LRESULT resAdress;
+		HWND hwndPhone;
+		LRESULT resPhone;
+		
 		int count;
 		// Parse the menu selections:
 		switch (wmId)
@@ -263,60 +260,104 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			FreeLibrary(dataBaseLibrary);
 			DestroyWindow(hWnd);
 			break;
-		case SURNAME_BUTTON:
-			input = (char*)malloc(sizeof(char)* 40);
-			GetWindowTextA(hSurnameEdit, input, 40);
-			abonentsArray = DataBaseSearchBySecondNameFunction(input);
-			if (abonentsArray == 0)
+		case RESULT_BUTTON:
+			resSurname = SendMessage(hSurnameCheckBox, BM_GETCHECK, 0, 0);
+			resAdress = SendMessage(hAdressCheckBox, BM_GETCHECK, 0, 0);
+			resPhone = SendMessage(hTelephoneCheckBox, BM_GETCHECK, 0, 0);
+			if (resSurname == BST_UNCHECKED && resAdress == BST_UNCHECKED && resPhone == BST_UNCHECKED)
 				break;
-			SetWindowText(hResultEdit, L"");
-			count = _msize(abonentsArray) / sizeof(abonentsArray[0]);
-			for (int i = 0; i < count; i++)
+			adress = (char*)malloc(sizeof(char)* 40);
+			secondName = (char*)malloc(sizeof(char)* 40);
+			phoneNumber = (char*)malloc(sizeof(char)* 40);
+			GetWindowTextA(hSurnameEdit, secondName, 40);
+			if (resSurname == BST_CHECKED)
 			{
-				for (int j = 0; j < 4; j++)
+				if (strcmp(secondName, "") == 0)
 				{
-					AddText(hResultEdit, abonentsArray[i][j]);
-					AddText(hResultEdit, " ");
+					MessageBox(hWnd, L"Enter data", NULL, MB_OK);
+					break;
 				}
-				AddText(hResultEdit, "\n");
+				abonentsArray = DataBaseSearchBySecondNameFunction(secondName);
+				if (abonentsArray == 0)
+					break;
+				count = _msize(abonentsArray) / sizeof(abonentsArray[0]);
+				for (int i = 0; i < count; i++)
+				{
+					result = new char[255];
+					strcpy_s(result, 2, "");
+					for (int j = 0; j < 4; j++)
+					{
+						strcat_s(result, _msize(result) + 1, abonentsArray[i][j]);		
+						strcat_s(result,_msize(result) + 1, " ");
+					}
+					resultsVector.push_back(result);
+				}
 			}
-			break;
-		case ADRESS_BUTTON:
-			input = (char*)malloc(sizeof(char)* 40);
-			GetWindowTextA(hAdressEdit, input, 40);
-			abonentsArray = DataBaseSearchByAdressFunction(input);
-			if (abonentsArray == 0)
+			GetWindowTextA(hAdressEdit, adress, 40);
+			if (strcmp(adress, "") == 0 && resAdress == BST_CHECKED)
+			{
+				MessageBox(hWnd, L"Enter data", NULL, MB_OK);
 				break;
-			SetWindowText(hResultEdit, L"");
-			count = _msize(abonentsArray) / sizeof(abonentsArray[0]);
-			for (int i = 0; i < count; i++)
-			{
-				for (int j = 0; j < 4; j++)
-				{
-					AddText(hResultEdit, abonentsArray[i][j]);
-					AddText(hResultEdit, " ");
-				}
-				AddText(hResultEdit, "\n");
 			}
-			break;
-		case TELEPHONE_BUTTON:
-			input = (char*)malloc(sizeof(char)* 40);
-			GetWindowTextA(hTelephoneEdit, input, 40);
-			abonentsArray = DataBaseSearchPhoneNumberFunction(input);
-			if (abonentsArray == 0)
+			if (resAdress == BST_CHECKED && resSurname == BST_UNCHECKED)
+			{
+				abonentsArray = DataBaseSearchByAdressFunction(adress);
+				if (abonentsArray == 0)
+					break;
+				count = _msize(abonentsArray) / sizeof(abonentsArray[0]);
+				for (int i = 0; i < count; i++)
+				{
+					result = new char[255];
+					strcpy_s(result, 2, "");
+					for (int j = 0; j < 4; j++)
+					{
+						strcat_s(result, _msize(result) + 1, abonentsArray[i][j]);
+						strcat_s(result, _msize(result) + 1, " ");
+					}
+					resultsVector.push_back(result);
+				}
+			}
+
+			GetWindowTextA(hTelephoneEdit, phoneNumber, 40);
+			if (strcmp(phoneNumber, "") == 0 && resPhone == BST_CHECKED)
+			{
+				MessageBox(hWnd, L"Enter data", NULL, MB_OK);
 				break;
-			SetWindowText(hResultEdit, L"");
-			count = _msize(abonentsArray) / sizeof(abonentsArray[0]);
-			for (int i = 0; i < count; i++)
-			{
-				for (int j = 0; j < 4; j++)
-				{
-					AddText(hResultEdit, abonentsArray[i][j]);
-					AddText(hResultEdit, " ");
-				}
-				AddText(hResultEdit, "\n");
 			}
-			break;
+			if (resPhone == BST_CHECKED && resSurname == BST_UNCHECKED && resAdress == BST_UNCHECKED)
+			{
+				
+				abonentsArray = DataBaseSearchPhoneNumberFunction(phoneNumber);
+				if (abonentsArray == 0)
+					break;
+				count = _msize(abonentsArray) / sizeof(abonentsArray[0]);
+				for (int i = 0; i < count; i++)
+				{
+					result = new char[255];
+					strcpy_s(result, _msize(result) + 1, "");
+					for (int j = 0; j < 4; j++)
+					{
+						strcat_s(result, _msize(result) + 1, abonentsArray[i][j]);
+						strcat_s(result, _msize(result) + 1, " ");
+					}
+					resultsVector.push_back(result);
+				}
+			}
+			SetWindowText(hResultEdit, L"");
+			for (int i = 0; i < resultsVector.size(); i++)
+			{
+				if (strstr(resultsVector[i], secondName) != 0 || resSurname == BST_UNCHECKED)
+				{
+					if (strstr(resultsVector[i], adress) != 0 || resAdress == BST_UNCHECKED)
+					{
+						if (strstr(resultsVector[i], phoneNumber) != 0 || resPhone == BST_UNCHECKED)
+						{
+							AddText(hResultEdit, resultsVector[i]);
+							AddText(hResultEdit, "\n");
+						}
+					}
+				}
+			}
 			break;
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam);
