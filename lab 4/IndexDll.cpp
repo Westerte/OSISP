@@ -38,7 +38,7 @@ TT* numberBTree = new TT;
 void CreateBTree(TT* T);
 void BTreeInsert(TT *T, TKey* k);
 int BTreeDelete(TNode* x, char* key);
-void BTreeSearch(TNode* x, char* key, TNode* resultNode, int* resultIndex);
+TNode* BTreeSearch(TNode* x, char* key, int* resultIndex);
 void DataBaseInsert(char secondName[20], char initials[5], char number[15], char adress[20]);
 
 extern "C"__declspec(dllexport) void __stdcall CreateIndex()
@@ -59,7 +59,6 @@ extern "C"__declspec(dllexport) void __stdcall LoadPhoneBase()
 	char adress[20];
 	while (fgets(currentAbonent, 55, phoneBaseFile) != 0)
 	{
-		fgets(currentAbonent, 70, phoneBaseFile);
 		int i = 0;
 		while (currentAbonent[i] != ';')
 		{
@@ -106,27 +105,25 @@ extern "C"__declspec(dllexport) void __stdcall LoadPhoneBase()
 
 extern "C" __declspec(dllexport) char*** __stdcall DataBaseSearch(char secondName[20])
 {
-	char*** resultArray;
-	TNode* resultNode;
 	int resultIndex = 1;
-	BTreeSearch(secondNameBTree->root, secondName, resultNode, &resultIndex);
-	if (resultNode != NULL)
+	TNode* resultNode = BTreeSearch(secondNameBTree->root, secondName, &resultIndex);
+	if (resultIndex != -1)
 	{
 		std::vector<Abonent*> abonentsList = resultNode->keyArray[resultIndex].abonentsList;
 		int vectorSize = abonentsList.size();
-		resultArray = new char**[vectorSize * 5];
+		char*** exitArray = new char**[vectorSize];
 		for (int i = 0; i < vectorSize; i++)
 		{
-			resultArray[i] = new char*[4];
-			resultArray[i][0] = resultNode->keyArray[resultIndex].abonentsList[i]->secondName;
-			resultArray[i][1] = resultNode->keyArray[resultIndex].abonentsList[i]->initials;
-			resultArray[i][2] = resultNode->keyArray[resultIndex].abonentsList[i]->number;
-			resultArray[i][3] = resultNode->keyArray[resultIndex].abonentsList[i]->adress;
+			char** resultArray = new char*[4];
+			resultArray[0] = resultNode->keyArray[resultIndex].abonentsList[i]->secondName;
+			resultArray[1] = resultNode->keyArray[resultIndex].abonentsList[i]->initials;
+			resultArray[2] = resultNode->keyArray[resultIndex].abonentsList[i]->adress;
+			resultArray[3] = resultNode->keyArray[resultIndex].abonentsList[i]->number;
+			exitArray[i] = resultArray;
 		}
-		return resultArray;
+		return exitArray;
 	}
-	else
-		return 0;
+	return 0;
 }
 
 extern "C" __declspec(dllexport) void __stdcall DataBaseDelete(char secondName[20])
@@ -141,9 +138,8 @@ void DataBaseInsert(char secondName[20], char initials[5], char number[15], char
 	strcpy(newAbonent->initials, initials);
 	strcpy(newAbonent->number, number);
 	strcpy(newAbonent->adress, adress);
-	TNode* resultNode = new TNode;
 	int resultIndex = 1;
-	BTreeSearch(secondNameBTree->root, secondName, resultNode, &resultIndex);
+	TNode *resultNode = BTreeSearch(secondNameBTree->root, secondName, &resultIndex);
 	if (resultIndex == -1)
 	{
 		TKey* k = new TKey;
@@ -155,7 +151,7 @@ void DataBaseInsert(char secondName[20], char initials[5], char number[15], char
 	{
 		resultNode->keyArray[resultIndex].abonentsList.push_back(newAbonent);
 	}
-	BTreeSearch(adressBTree->root, adress, resultNode, &resultIndex);
+	resultNode = BTreeSearch(adressBTree->root, adress, &resultIndex);
 	if (resultIndex == -1)
 	{
 		TKey* k = new TKey;
@@ -167,7 +163,7 @@ void DataBaseInsert(char secondName[20], char initials[5], char number[15], char
 	{
 		resultNode->keyArray[resultIndex].abonentsList.push_back(newAbonent);
 	}
-	BTreeSearch(numberBTree->root, number, resultNode, &resultIndex);
+	resultNode = BTreeSearch(numberBTree->root, number, &resultIndex);
 	if (resultIndex == -1)
 	{
 		TKey* k = new TKey;
@@ -261,24 +257,26 @@ void BTreeInsert(TT *T, TKey* k)
 		BTreeInsertNonFull(root, k);
 }
 
-void BTreeSearch(TNode* x, char* key, TNode *resultNode, int* resultIndex)
+TNode* BTreeSearch(TNode* x, char* key, int* resultIndex)
 {
 	int i = 0;
 	while (i <= x->keyNumber - 1 && strcmp(key, x->keyArray[i].key) > 0)
 		i++;
 	if (i < x->keyNumber && strcmp(key,x->keyArray[i].key)==0)
 	{
-		*resultNode = *x;
+
 		*resultIndex = i;
+		return x;
 	}
 	else
 	{
 		if (x->isLeaf == true)
 		{
 			*resultIndex = -1;
+			return 0;
 		}
 		else
-			BTreeSearch(x->childrenArray[i], key, resultNode, resultIndex);
+			BTreeSearch(x->childrenArray[i], key, resultIndex);
 	}
 }
 
