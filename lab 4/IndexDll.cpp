@@ -56,7 +56,7 @@ extern "C"__declspec(dllexport) void __stdcall LoadPhoneBase()
 	char secondName[20];
 	char initials[5];
 	char number[15];
-	char adress[20];
+	char adress[40];
 	while (fgets(currentAbonent, 55, phoneBaseFile) != 0)
 	{
 		int i = 0;
@@ -103,10 +103,56 @@ extern "C"__declspec(dllexport) void __stdcall LoadPhoneBase()
 	}
 }
 
-extern "C" __declspec(dllexport) char*** __stdcall DataBaseSearch(char secondName[20])
+extern "C" __declspec(dllexport) char*** __stdcall DataBaseSearchBySecondName(char secondName[20])
 {
 	int resultIndex = 1;
 	TNode* resultNode = BTreeSearch(secondNameBTree->root, secondName, &resultIndex);
+	if (resultIndex != -1)
+	{
+		std::vector<Abonent*> abonentsList = resultNode->keyArray[resultIndex].abonentsList;
+		int vectorSize = abonentsList.size();
+		char*** exitArray = new char**[vectorSize];
+		for (int i = 0; i < vectorSize; i++)
+		{
+			char** resultArray = new char*[4];
+			resultArray[0] = resultNode->keyArray[resultIndex].abonentsList[i]->secondName;
+			resultArray[1] = resultNode->keyArray[resultIndex].abonentsList[i]->initials;
+			resultArray[2] = resultNode->keyArray[resultIndex].abonentsList[i]->adress;
+			resultArray[3] = resultNode->keyArray[resultIndex].abonentsList[i]->number;
+			exitArray[i] = resultArray;
+		}
+		return exitArray;
+	}
+	return 0;
+}
+
+extern "C" __declspec(dllexport) char*** __stdcall DataBaseSearchByAdress(char adress[40])
+{
+	int resultIndex = 1;
+	TNode* resultNode = BTreeSearch(adressBTree->root, adress, &resultIndex);
+	if (resultIndex != -1)
+	{
+		std::vector<Abonent*> abonentsList = resultNode->keyArray[resultIndex].abonentsList;
+		int vectorSize = abonentsList.size();
+		char*** exitArray = new char**[vectorSize];
+		for (int i = 0; i < vectorSize; i++)
+		{
+			char** resultArray = new char*[4];
+			resultArray[0] = resultNode->keyArray[resultIndex].abonentsList[i]->secondName;
+			resultArray[1] = resultNode->keyArray[resultIndex].abonentsList[i]->initials;
+			resultArray[2] = resultNode->keyArray[resultIndex].abonentsList[i]->adress;
+			resultArray[3] = resultNode->keyArray[resultIndex].abonentsList[i]->number;
+			exitArray[i] = resultArray;
+		}
+		return exitArray;
+	}
+	return 0;
+}
+
+extern "C" __declspec(dllexport) char*** __stdcall DataBaseSearchPhoneNumber(char phoneNumber[20])
+{
+	int resultIndex = 1;
+	TNode* resultNode = BTreeSearch(numberBTree->root, phoneNumber, &resultIndex);
 	if (resultIndex != -1)
 	{
 		std::vector<Abonent*> abonentsList = resultNode->keyArray[resultIndex].abonentsList;
@@ -131,7 +177,7 @@ extern "C" __declspec(dllexport) void __stdcall DataBaseDelete(char secondName[2
 	
 }
 
-void DataBaseInsert(char secondName[20], char initials[5], char number[15], char adress[20])
+void DataBaseInsert(char secondName[20], char initials[5], char number[15], char adress[40])
 {
 	Abonent* newAbonent = new Abonent;
 	strcpy(newAbonent->secondName, secondName);
