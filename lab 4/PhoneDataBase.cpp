@@ -37,6 +37,23 @@ HWND hTelephoneCheckBox;
 TCHAR szTitle[MAX_LOADSTRING];					// The title bar text
 TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
 
+
+typedef void __stdcall TCreateIndex();
+typedef void __stdcall TLoadPhoneBase();
+typedef void __stdcall TInsert(char secondName[255]);
+typedef int __stdcall TDelete(char secondName[255]);
+typedef char*** __stdcall TDataBaseSearchBySecondName(char secondName[20]);
+typedef char*** __stdcall TDataBaseSearchByAdress(char secondName[20]);
+typedef char*** __stdcall TDataBaseSearchPhoneNumber(char phoneNumber[15]);
+
+HMODULE dataBaseLibrary = LoadLibrary(L"IndexDll.dll");
+TCreateIndex* CreateIndexFunction;
+TDelete* DeleteFunction;
+TLoadPhoneBase* LoadPhoneBaseFunction;
+TDataBaseSearchBySecondName* DataBaseSearchBySecondNameFunction;
+TDataBaseSearchByAdress* DataBaseSearchByAdressFunction;
+TDataBaseSearchPhoneNumber* DataBaseSearchPhoneNumberFunction;
+
 // Forward declarations of functions included in this code module:
 ATOM				MyRegisterClass(HINSTANCE hInstance);
 BOOL				InitInstance(HINSTANCE, int);
@@ -68,7 +85,7 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	}
 
 	hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_PHONEDATABASE));
-	baseLoaded = false;
+
 
 	// Main message loop:
 	while (GetMessage(&msg, NULL, 0, 0))
@@ -157,7 +174,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	hAdressLabel = CreateWindow(L"static", L"hAdressLabel", WS_CHILD | WS_VISIBLE, x, y, w, h, hWnd, NULL, hInstance, NULL);
 	SetWindowText(hAdressLabel, L"Adress:");
 
-	hAdressEdit = CreateWindowEx(WS_EX_CLIENTEDGE, L"edit", L"hAdressEdit", WS_CHILD | WS_VISIBLE | ES_LEFT,
+	hAdressEdit = CreateWindowEx(WS_EX_CLIENTEDGE, L"edit", L"hAdressEdit", WS_CHILD | WS_VISIBLE | ES_LEFT | ES_AUTOHSCROLL,
 		x + 100, y, w + 50, h, hWnd, (HMENU)ADRESS_EDIT, hInstance, NULL);
 	SetWindowText(hAdressEdit, L"");
 
@@ -200,6 +217,14 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	ShowWindow(hWnd, nCmdShow);
 	UpdateWindow(hWnd);
 
+	CreateIndexFunction = (TCreateIndex*)GetProcAddress(dataBaseLibrary, "_CreateIndex@0");
+	DeleteFunction = (TDelete*)GetProcAddress(dataBaseLibrary, "_DataBaseDelete@4");
+	LoadPhoneBaseFunction = (TLoadPhoneBase*)GetProcAddress(dataBaseLibrary, "_LoadPhoneBase@0");
+	DataBaseSearchBySecondNameFunction = (TDataBaseSearchBySecondName*)GetProcAddress(dataBaseLibrary, "_DataBaseSearchBySecondName@4");
+	DataBaseSearchByAdressFunction = (TDataBaseSearchByAdress*)GetProcAddress(dataBaseLibrary, "_DataBaseSearchByAdress@4");
+	DataBaseSearchPhoneNumberFunction = (TDataBaseSearchPhoneNumber*)GetProcAddress(dataBaseLibrary, "_DataBaseSearchPhoneNumber@4");
+	CreateIndexFunction();
+	LoadPhoneBaseFunction();
 	return TRUE;
 }
 
@@ -226,6 +251,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		wmEvent = HIWORD(wParam);
 
 		char* input;
+		char ***abonentsArray;
+		int count;
 		// Parse the menu selections:
 		switch (wmId)
 		{
@@ -233,13 +260,63 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
 			break;
 		case IDM_EXIT:
+			FreeLibrary(dataBaseLibrary);
 			DestroyWindow(hWnd);
 			break;
 		case SURNAME_BUTTON:
+			input = (char*)malloc(sizeof(char)* 40);
+			GetWindowTextA(hSurnameEdit, input, 40);
+			abonentsArray = DataBaseSearchBySecondNameFunction(input);
+			if (abonentsArray == 0)
+				break;
+			SetWindowText(hResultEdit, L"");
+			count = _msize(abonentsArray) / sizeof(abonentsArray[0]);
+			for (int i = 0; i < count; i++)
+			{
+				for (int j = 0; j < 4; j++)
+				{
+					AddText(hResultEdit, abonentsArray[i][j]);
+					AddText(hResultEdit, " ");
+				}
+				AddText(hResultEdit, "\n");
+			}
 			break;
 		case ADRESS_BUTTON:
+			input = (char*)malloc(sizeof(char)* 40);
+			GetWindowTextA(hAdressEdit, input, 40);
+			abonentsArray = DataBaseSearchByAdressFunction(input);
+			if (abonentsArray == 0)
+				break;
+			SetWindowText(hResultEdit, L"");
+			count = _msize(abonentsArray) / sizeof(abonentsArray[0]);
+			for (int i = 0; i < count; i++)
+			{
+				for (int j = 0; j < 4; j++)
+				{
+					AddText(hResultEdit, abonentsArray[i][j]);
+					AddText(hResultEdit, " ");
+				}
+				AddText(hResultEdit, "\n");
+			}
 			break;
 		case TELEPHONE_BUTTON:
+			input = (char*)malloc(sizeof(char)* 40);
+			GetWindowTextA(hTelephoneEdit, input, 40);
+			abonentsArray = DataBaseSearchPhoneNumberFunction(input);
+			if (abonentsArray == 0)
+				break;
+			SetWindowText(hResultEdit, L"");
+			count = _msize(abonentsArray) / sizeof(abonentsArray[0]);
+			for (int i = 0; i < count; i++)
+			{
+				for (int j = 0; j < 4; j++)
+				{
+					AddText(hResultEdit, abonentsArray[i][j]);
+					AddText(hResultEdit, " ");
+				}
+				AddText(hResultEdit, "\n");
+			}
+			break;
 			break;
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam);
@@ -263,7 +340,6 @@ void AddText(HWND hEdit, char* text)
 {
 	SendMessageA(hEdit, EM_SETSEL, -1, -1);
 	SendMessageA(hEdit, EM_REPLACESEL, FALSE, (LPARAM)text);
-	SendMessageA(hEdit, EM_REPLACESEL, FALSE, (LPARAM)"\n");
 }
 
 // Message handler for about box.
