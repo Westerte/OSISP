@@ -89,9 +89,9 @@ extern "C"__declspec(dllexport) void __stdcall LoadPhoneBase()
 	}
 }
 
-extern "C" _declspec(dllexport) char*** _stdcall FindBySecondName(char secondName[26])
+extern "C" _declspec(dllexport) char*** _stdcall Find(char stringToFind[87], int mod)
 {
-	std::vector<Abonent> abonentsVector;
+	std::vector<Abonent*> abonentsVector;
 	int hightOffset = 0;
 	int numberOfPages = 1;
 	Abonent** abonentsArray = (Abonent**)MapViewOfFile(fileMappingHandle, FILE_MAP_WRITE, 0, 0, numberOfBitsToFileView);
@@ -112,10 +112,28 @@ extern "C" _declspec(dllexport) char*** _stdcall FindBySecondName(char secondNam
 				numberOfPages = 0;
 			}
 		}
-		if (strstr(abonentsArray[i]->secondName, secondName))
+		switch (mod)
 		{
-			abonentsVector.push_back(*abonentsArray[i]);
+		case 0:
+			if (strstr(abonentsArray[j]->secondName, stringToFind))
+			{
+				abonentsVector.push_back(abonentsArray[j]);
+			}
+			break;
+		case 1:
+			if (strstr(abonentsArray[j]->adress, stringToFind))
+			{
+				abonentsVector.push_back(abonentsArray[j]);
+			}
+			break;
+		case 2:
+			if (strcmp(abonentsArray[j]->number, stringToFind) == 0)
+			{
+				abonentsVector.push_back(abonentsArray[j]);
+			}
+			break;
 		}
+		
 		j++;
 	}
 	int vectorSize = abonentsVector.size();
@@ -123,9 +141,9 @@ extern "C" _declspec(dllexport) char*** _stdcall FindBySecondName(char secondNam
 	for (int i = 0; i < vectorSize; i++)
 	{
 		char** resultArray = new char*[3];
-		resultArray[0] = abonentsVector[i].secondName;
-		resultArray[1] = abonentsVector[i].adress;
-		resultArray[2] = abonentsVector[i].number;
+		resultArray[0] = abonentsVector[i]->secondName;
+		resultArray[1] = abonentsVector[i]->adress;
+		resultArray[2] = abonentsVector[i]->number;
 		exitArray[i] = resultArray;
 	}
 	return exitArray;
