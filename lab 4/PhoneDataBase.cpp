@@ -140,11 +140,10 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
 
-
 	hInst = hInstance; // Store instance handle in our global variable
 
 	hWnd = CreateWindow(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-		CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
+		CW_USEDEFAULT, 0, 810, 700, NULL, NULL, hInstance, NULL);
 
 
 	int x, w, y, h;
@@ -155,10 +154,10 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 		x - 20, y, 20, 20, hWnd, (HMENU)SURNAME_CHECKBOX, hInstance, NULL);
 
 	hSurnameLabel = CreateWindow(L"static", L"hSurnameLabel", WS_CHILD | WS_VISIBLE, x, y, w, h, hWnd, NULL, hInstance, NULL);
-	SetWindowText(hSurnameLabel, L"Surname:");
+	SetWindowText(hSurnameLabel, L"ФИО:");
 
 	hSurnameEdit = CreateWindowEx(WS_EX_CLIENTEDGE, L"edit", L"hSurnameEdit", WS_CHILD | WS_VISIBLE | ES_LEFT,
-		x + 100, y, w + 50, h, hWnd, (HMENU)SURNAME_EDIT, hInstance, NULL);
+		x + 130, y, w + 50, h, hWnd, (HMENU)SURNAME_EDIT, hInstance, NULL);
 	SetWindowText(hSurnameEdit, L"");
 	y = 40;
 
@@ -166,33 +165,33 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 		x - 20, y, 20, 20, hWnd, (HMENU)ADRESS_CHECKBOX, hInstance, NULL);
 
 	hAdressLabel = CreateWindow(L"static", L"hAdressLabel", WS_CHILD | WS_VISIBLE, x, y, w, h, hWnd, NULL, hInstance, NULL);
-	SetWindowText(hAdressLabel, L"Adress:");
+	SetWindowText(hAdressLabel, L"Адрес:");
 
 	hAdressEdit = CreateWindowEx(WS_EX_CLIENTEDGE, L"edit", L"hAdressEdit", WS_CHILD | WS_VISIBLE | ES_LEFT | ES_AUTOHSCROLL,
-		x + 100, y, w + 50, h, hWnd, (HMENU)ADRESS_EDIT, hInstance, NULL);
+		x + 130, y, w + 50, h, hWnd, (HMENU)ADRESS_EDIT, hInstance, NULL);
 	SetWindowText(hAdressEdit, L"");
 	y = 70;
 
 	hTelephoneCheckBox = CreateWindow(L"button", L"hTelephoneCheckBox", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
 		x - 20, y, 20, 20, hWnd, (HMENU)TELEPHONE_CHECKBOX, hInstance, NULL);
 
-	hTelephoneLabel = CreateWindow(L"static", L"hTelephoneLabel", WS_CHILD | WS_VISIBLE, x, y, w, h, hWnd, NULL, hInstance, NULL);
-	SetWindowText(hTelephoneLabel, L"Telephone:");
+	hTelephoneLabel = CreateWindow(L"static", L"hTelephoneLabel", WS_CHILD | WS_VISIBLE, x, y, w + 40, h, hWnd, NULL, hInstance, NULL);
+	SetWindowText(hTelephoneLabel, L"Номер телефона:");
 
 	hTelephoneEdit = CreateWindowEx(WS_EX_CLIENTEDGE, L"edit", L"hTelephoneEdit", WS_CHILD | WS_VISIBLE | ES_LEFT,
-		x + 100, y, w + 50, h, hWnd, (HMENU)TELEPHONE_EDIT, hInstance, NULL);
+		x + 130, y, w + 50, h, hWnd, (HMENU)TELEPHONE_EDIT, hInstance, NULL);
 	SetWindowText(hTelephoneEdit, L"");
 
 	y = 100;
 
 	hFindAllButton = CreateWindow(L"button", L"hFindAllButton", WS_CHILD | WS_VISIBLE,
-		x - 20, y, w + 170, h, hWnd, (HMENU)RESULT_BUTTON, hInstance, NULL);
-	SetWindowText(hFindAllButton, L"Find Abonent");
+		x - 20, y, w + 200, h * 2, hWnd, (HMENU)RESULT_BUTTON, hInstance, NULL);
+	SetWindowText(hFindAllButton, L"Найти");
 
 	y = 130;
 
 	hResultEdit = CreateWindowEx(WS_EX_CLIENTEDGE, L"edit", L"hResultEdit", WS_CHILD | WS_VISIBLE | ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL,
-		x - 20, y, 990, 330, hWnd, (HMENU)TELEPHONE_EDIT, hInstance, NULL);
+		x + 300, y - 120, w * 5, h * 30, hWnd, (HMENU)TELEPHONE_EDIT, hInstance, NULL);
 	SetWindowText(hResultEdit, L"");
 
 	if (!hWnd)
