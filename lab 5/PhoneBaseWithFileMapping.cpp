@@ -182,9 +182,10 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 	y = 130;
 
-	hResultEdit = CreateWindowEx(WS_EX_CLIENTEDGE, L"edit", L"hResultEdit", WS_CHILD | WS_VISIBLE | ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL,
+	hResultEdit = CreateWindowEx(WS_EX_CLIENTEDGE, L"edit", L"hResultEdit", WS_CHILD | WS_VISIBLE | ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL|WS_VSCROLL,
 		x + 300, y - 120, w*5, h*30, hWnd, (HMENU)TELEPHONE_EDIT, hInstance, NULL);
 	SetWindowText(hResultEdit, L"");
+	SendMessage(hResultEdit, )
 
 	if (!hWnd)
 	{
