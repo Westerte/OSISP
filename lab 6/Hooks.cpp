@@ -6,6 +6,7 @@
 #include <vector>
 #include "windows.h"
 #include "TlHelp32.h"
+#include "Dbghelp.h"
 
 DWORD idProcessThatWillHaveMyDll;
 
@@ -16,9 +17,9 @@ bool CreateRemoteThreadWithMyDll(HANDLE remoteProcessHandle, void *baseAdressToI
 BOOL SetPrivilege(HANDLE token, LPCTSTR privilegeName, BOOL isEnabled);
 
 wchar_t libraryPath[55] = L"D:\\Работы\\ОСиСП\\Лабораторная6\\Hooks\\Debug\\HooksDll.dll";
-void* injectAdress;
+
 int _tmain(int argc, _TCHAR* argv[])
-{
+{		
 	std::wcout << "*****Good day, man, i'm your 6 lab, please be gentle with me*****" << std::endl;
 	wchar_t exitChoice[2] = L"y";
 	while (wcscmp(exitChoice, L"y") == 0)
@@ -108,10 +109,10 @@ std::vector<int> addDllToAllProcessByIDs(std::vector<DWORD> allProccessID)
 				if (CreateRemoteThreadWithMyDll(currentProcessHandle, baseAdressToInject))
 				{
 					truePidsNumbersInALLProcessID.push_back(i);
-					VirtualFreeEx(currentProcessHandle, baseAdressToInject, (lstrlenW(libraryPath) + 1)*sizeof(wchar_t), MEM_RELEASE);
+					/*VirtualFreeEx(currentProcessHandle, baseAdressToInject, (lstrlenW(libraryPath) + 1)*sizeof(wchar_t), MEM_RELEASE);
 					PTHREAD_START_ROUTINE freeLibraryThreadRoutine = (PTHREAD_START_ROUTINE)GetProcAddress(GetModuleHandle(L"Kernel32.dll"), "FreeLibrary");
-					HANDLE remoteThreadToFreeLibrary = CreateRemoteThread(currentProcessHandle, NULL, 0, (LPTHREAD_START_ROUTINE)freeLibraryThreadRoutine, 0, 0, NULL);
-					WaitForSingleObject(remoteThreadToFreeLibrary, INFINITE);
+					HANDLE remoteThreadToFreeLibrary = CreateRemoteThread(currentProcessHandle, NULL, 0, (LPTHREAD_START_ROUTINE)freeLibraryThreadRoutine, 0, 0, NULL);*/
+					/*WaitForSingleObject(remoteThreadToFreeLibrary, INFINITE);*/
 				}
 			}
 		}
