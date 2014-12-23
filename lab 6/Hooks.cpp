@@ -24,12 +24,12 @@ int _tmain(int argc, _TCHAR* argv[])
 	wchar_t exitChoice[2] = L"y";
 	while (wcscmp(exitChoice, L"y") == 0)
 	{
-		wchar_t* enteredProcessName = new wchar_t[30];
-		
+		//wchar_t* enteredProcessName = new wchar_t[80];
+		wchar_t* enteredProccesName = new wchar_t[80];
 		std::wcout << "Enter process name: ";
-		std::wcin >> enteredProcessName;
+		std::fgetws(enteredProccesName, 80 * sizeof(wchar_t), stdin);
 		std::vector<DWORD> allProccessIDWithThisName;
-		idProcessThatWillHaveMyDll = GetProcessIDByProcessName(enteredProcessName, allProccessIDWithThisName);
+		/*idProcessThatWillHaveMyDll = GetProcessIDByProcessName(enteredProcessName, allProccessIDWithThisName);
 		int numberOfProcessWithCurrentName = allProccessIDWithThisName.size();
 		if (numberOfProcessWithCurrentName == 0)
 		{
@@ -55,6 +55,32 @@ int _tmain(int argc, _TCHAR* argv[])
 				{
 					std::wcout << allProccessIDWithThisName[truePidsNumbersInAllProcessID[i]] << std::endl;
 				}
+			}
+		}*/
+		STARTUPINFO startapInfoToStartPocess = { sizeof(STARTUPINFO) };
+		PROCESS_INFORMATION processInfo;
+		wchar_t currentProcessName[80];
+		int i = 0;
+		while (enteredProccesName[i] !='\n')
+		{
+			currentProcessName[i] = enteredProccesName[i];
+			i++;
+		}
+		currentProcessName[i] = '\0';
+		CreateProcessW(currentProcessName, NULL, NULL, NULL, TRUE, CREATE_NEW_CONSOLE, NULL, NULL, &startapInfoToStartPocess, &processInfo);
+		allProccessIDWithThisName.push_back(processInfo.dwProcessId);
+		std::vector<int> truePidsNumbersInAllProcessID = addDllToAllProcessByIDs(allProccessIDWithThisName);
+		int numberOfTruePids = truePidsNumbersInAllProcessID.size();
+		if (numberOfTruePids == 0)
+		{
+			std::wcout << "Daaaamn, we can't do this processes" << std::endl;
+		}
+		else
+		{
+			std::wcout << "We have owned processes with PIDs:" << std::endl;
+			for (int i = 0; i < numberOfTruePids; i++)
+			{
+				std::wcout << allProccessIDWithThisName[truePidsNumbersInAllProcessID[i]] << std::endl;
 			}
 		}
 		std::wcout << "Do you want to continue? y/n ";
@@ -109,10 +135,7 @@ std::vector<int> addDllToAllProcessByIDs(std::vector<DWORD> allProccessID)
 				if (CreateRemoteThreadWithMyDll(currentProcessHandle, baseAdressToInject))
 				{
 					truePidsNumbersInALLProcessID.push_back(i);
-					/*VirtualFreeEx(currentProcessHandle, baseAdressToInject, (lstrlenW(libraryPath) + 1)*sizeof(wchar_t), MEM_RELEASE);
-					PTHREAD_START_ROUTINE freeLibraryThreadRoutine = (PTHREAD_START_ROUTINE)GetProcAddress(GetModuleHandle(L"Kernel32.dll"), "FreeLibrary");
-					HANDLE remoteThreadToFreeLibrary = CreateRemoteThread(currentProcessHandle, NULL, 0, (LPTHREAD_START_ROUTINE)freeLibraryThreadRoutine, 0, 0, NULL);*/
-					/*WaitForSingleObject(remoteThreadToFreeLibrary, INFINITE);*/
+					VirtualFreeEx(currentProcessHandle, baseAdressToInject, (lstrlenW(libraryPath) + 1)*sizeof(wchar_t), MEM_RELEASE);
 				}
 			}
 		}

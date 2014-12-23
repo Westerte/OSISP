@@ -19,6 +19,42 @@ typedef HANDLE(WINAPI *CREATEFILEW)(LPCWSTR lpFileName,
 	DWORD dwFlagsAndAttributes,
 	HANDLE hTemplateFile);
 
+typedef BOOL(WINAPI *WRITEFILE)(
+	HANDLE hFile,
+	LPCVOID lpBuffer,
+	DWORD nNumberOfBytesToWrite,
+	LPDWORD lpNumberOfBytesWritten,
+	LPOVERLAPPED lpOverlapped);
+
+typedef BOOL(WINAPI *READFILE)(
+	HANDLE hFile,
+	LPVOID lpBuffer,
+	DWORD nNumberOfBytesToRead,
+	LPDWORD lpNumberOfBytesRead,
+	LPOVERLAPPED lpOverlapped);
+
+typedef LONG(WINAPI *REGCREATEKEYEXW)(
+	HKEY hKey,
+	LPCTSTR lpSubKey,
+	DWORD Reserved,
+	LPTSTR lpClass,
+	DWORD dwOptions,
+	REGSAM samDesired,
+	LPSECURITY_ATTRIBUTES lpSecurityAttributes,
+	PHKEY phkResult,
+	LPDWORD lpdwDisposition);
+
+typedef LONG(WINAPI *REGOPENKEYEXW)(
+	HKEY hKey,
+	LPCTSTR lpSubKey,
+	DWORD ulOptions,
+	REGSAM samDesired,
+	PHKEY phkResult);
+
+typedef LONG(WINAPI* REGCLOSEKEY)(
+	HKEY hKey);
+
+
 BOOL APIENTRY DllMain(HMODULE hModule,
 	DWORD  ul_reason_for_call,
 	LPVOID lpReserved
@@ -52,7 +88,8 @@ void WriteToLogFile(LPCWSTR function, LPCWSTR parameter)
 	wcscat_s(messageToLog, parameter);
 	wcscat_s(messageToLog, L"\r\n");
 	DWORD t = 0;
-	WriteFile(logFile, messageToLog, (lstrlenW(messageToLog) * sizeof(wchar_t)), &t, NULL);
+	PROC OriginalFunction = GetProcAddress(GetModuleHandleA("Kernel32.dll"), "WriteFile");
+	((WRITEFILE)OriginalFunction)(logFile, messageToLog, (lstrlenW(messageToLog) * sizeof(wchar_t)), &t, NULL);
 	LeaveCriticalSection(&criticalSection);
 }
 
@@ -105,24 +142,89 @@ HANDLE WINAPI MyCreateFileW(
 	DWORD dwFlagsAndAttributes,
 	HANDLE hTemplateFile)
 {
-	std::wcout << "it's strange" << std::endl;
 	WriteToLogFile(L"CreateFileW", lpFileName);
 	PROC OriginalFunction = GetProcAddress(GetModuleHandleA("Kernel32.dll"), "CreateFileW");
 	return ((CREATEFILEW)OriginalFunction)(lpFileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
 }
 
+BOOL WINAPI MyWriteFile(
+	HANDLE hFile,
+	LPCVOID lpBuffer,
+	DWORD nNumberOfBytesToWrite,
+	LPDWORD lpNumberOfBytesWritten,
+	LPOVERLAPPED lpOverlapped)
+{
+	wchar_t parametrsToLog[20];
+	_ltow_s(nNumberOfBytesToWrite, parametrsToLog, 20);
+	WriteToLogFile(L"WriteFile", L"LOL");
+	PROC OriginalFunction = GetProcAddress(GetModuleHandleA("Kernel32.dll"), "WriteFile");
+	return ((WRITEFILE)OriginalFunction)(hFile,	lpBuffer, nNumberOfBytesToWrite, lpNumberOfBytesWritten, lpOverlapped);
+}
+
+BOOL WINAPI MyReadFile(
+	HANDLE hFile,
+	LPVOID lpBuffer,
+	DWORD nNumberOfBytesToRead,
+	LPDWORD lpNumberOfBytesRead,
+	LPOVERLAPPED lpOverlapped)
+{
+	wchar_t parametrsToLog[20];
+	_ltow_s(nNumberOfBytesToRead, parametrsToLog, 20);
+	WriteToLogFile(L"ReadFile", parametrsToLog);
+	PROC OriginalFunction = GetProcAddress(GetModuleHandleA("Kernel32.dll"), "ReadFile");
+	return ((WRITEFILE)OriginalFunction)(hFile, lpBuffer, nNumberOfBytesToRead, lpNumberOfBytesRead, lpOverlapped);
+}
+
+LONG WINAPI MyRegCreateKeyExW(
+	HKEY hKey,
+	LPCTSTR lpSubKey,
+	DWORD Reserved,
+	LPTSTR lpClass,
+	DWORD dwOptions,
+	REGSAM samDesired,
+	LPSECURITY_ATTRIBUTES lpSecurityAttributes,
+	PHKEY phkResult,
+	LPDWORD lpdwDisposition)
+{
+	WriteToLogFile(L"RegCreateKeyExW", lpSubKey);
+	PROC OriginalFunction = GetProcAddress(GetModuleHandleA("Advapi32.dll"), "RegCreateKeyExW");
+	return ((REGCREATEKEYEXW)OriginalFunction)(hKey, lpSubKey, Reserved, lpClass, dwOptions, samDesired, lpSecurityAttributes, phkResult, lpdwDisposition);
+}
+LONG WINAPI MyRegOpenKeyExW(
+	HKEY hKey,
+	LPCTSTR lpSubKey,
+	DWORD ulOptions,
+	REGSAM samDesired,
+	PHKEY phkResult)
+{
+	WriteToLogFile(L"RegOpenKeyExW", lpSubKey);
+	PROC OriginalFunction = GetProcAddress(GetModuleHandleA("Advapi32.dll"), "RegOpenKeyExW");
+	return ((REGOPENKEYEXW)OriginalFunction)(hKey, lpSubKey, ulOptions, samDesired, phkResult);
+}
+
+LONG WINAPI MyRegCloseKey(
+	HKEY hKey)
+{
+	WriteToLogFile(L"RegCloseKey", L"");
+	PROC OriginalFunction = GetProcAddress(GetModuleHandleA("Advapi32.dll"), "RegCloseKey");
+	return ((REGCLOSEKEY)OriginalFunction)(hKey);
+}
+
 void ReplaceAllOldFunctionsToNewFunctionsInAllProcessModules()
 {
-
-	PROC OriginalFunction = GetProcAddress(GetModuleHandleA("Kernel32.dll"), "CreateFileW");
 	HANDLE snapOfModules = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, GetCurrentProcessId());
-	MODULEENTRY32 currentModule;
+	MODULEENTRY32 currentModule;;
 	currentModule.dwSize = sizeof(MODULEENTRY32);
 	if (Module32First(snapOfModules, &currentModule))
 	{
 		do
 		{			
-			ReplaceStandartFunctionToHoockFunction("Kernel32.dll", OriginalFunction, (PROC)MyCreateFileW, currentModule.hModule);
+			ReplaceStandartFunctionToHoockFunction("Kernel32.dll", GetProcAddress(GetModuleHandleA("Kernel32.dll"), "CreateFileW"), (PROC)MyCreateFileW, currentModule.hModule);
+			ReplaceStandartFunctionToHoockFunction("Kernel32.dll", GetProcAddress(GetModuleHandleA("Kernel32.dll"), "WriteFile"), (PROC)MyWriteFile, currentModule.hModule);	
+			ReplaceStandartFunctionToHoockFunction("Kernel32.dll", GetProcAddress(GetModuleHandleA("Kernel32.dll"), "ReadFile"), (PROC)MyReadFile, currentModule.hModule);
+			ReplaceStandartFunctionToHoockFunction("Advapi32.dll", GetProcAddress(GetModuleHandleA("Advapi32.dll"), "RegCreateKeyExW"), (PROC)MyRegCreateKeyExW, currentModule.hModule);
+			ReplaceStandartFunctionToHoockFunction("Advapi32.dll", GetProcAddress(GetModuleHandleA("Advapi32.dll"), "RegOpenKeyExW") , (PROC)MyRegOpenKeyExW, currentModule.hModule);
+			ReplaceStandartFunctionToHoockFunction("Advapi32.dll", GetProcAddress(GetModuleHandleA("Advapi32.dll"), "RegCloseKey"), (PROC)MyRegCloseKey, currentModule.hModule);
 		} 
 		while (Module32Next(snapOfModules, &currentModule));
 	}
